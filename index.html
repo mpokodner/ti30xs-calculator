@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TI-30XS MultiView Scientific Calculator</title>
+    <meta
+      name="description"
+      content="A fully functional TI-30XS MultiView scientific calculator web application with authentic design and advanced features."
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div
+      class="calculator"
+      role="application"
+      aria-label="TI-30XS MultiView Scientific Calculator"
+    >
+      <!-- Calculator Header -->
+      <header class="calculator__header">
+        <div class="calculator__brand">
+          <span class="brand__logo">TI</span>
+          <span class="brand__model">30XS</span>
+          <span class="brand__subtitle">MultiView</span>
+        </div>
+        <div class="calculator__solar-panel" aria-hidden="true"></div>
+      </header>
+
+      <!-- Calculator Display -->
+      <section
+        class="calculator__display"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <div
+          class="display__entry"
+          role="textbox"
+          aria-label="Entry line"
+          aria-readonly="true"
+          id="entry-display"
+        >
+          0
+        </div>
+        <div
+          class="display__result"
+          role="textbox"
+          aria-label="Result line"
+          aria-readonly="true"
+          id="result-display"
+        ></div>
+        <div class="display__indicators">
+          <span
+            class="indicator indicator--deg"
+            id="deg-indicator"
+            aria-label="Degree mode"
+            >DEG</span
+          >
+          <span
+            class="indicator indicator--memory"
+            id="memory-indicator"
+            aria-label="Memory stored"
+            >M</span
+          >
+          <span
+            class="indicator indicator--shift"
+            id="shift-indicator"
+            aria-label="Second function active"
+            >2nd</span
+          >
+          <span
+            class="indicator indicator--alpha"
+            id="alpha-indicator"
+            aria-label="Alpha function active"
+            >ALPHA</span
+          >
+        </div>
+      </section>
+
+      <!-- Calculator Keypad -->
+      <main
+        class="calculator__keypad"
+        role="grid"
+        aria-label="Calculator buttons"
+      >
+        <!-- Row 1: Mode and Function Keys -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--function"
+            data-key="2nd"
+            data-primary="2nd"
+            aria-label="Second function"
+          >
+            <span class="btn__primary">2nd</span>
+          </button>
+          <button
+            class="btn btn--function"
+            data-key="mode"
+            data-primary="MODE"
+            aria-label="Mode selection"
+          >
+            <span class="btn__primary">MODE</span>
+          </button>
+          <button
+            class="btn btn--function"
+            data-key="stat"
+            data-primary="STAT"
+            aria-label="Statistics"
+          >
+            <span class="btn__primary">STAT</span>
+          </button>
+          <button
+            class="btn btn--function"
+            data-key="data"
+            data-primary="DATA"
+            aria-label="Data operations"
+          >
+            <span class="btn__primary">DATA</span>
+          </button>
+          <button
+            class="btn btn--function"
+            data-key="setup"
+            data-primary="SETUP"
+            aria-label="Setup menu"
+          >
+            <span class="btn__primary">SETUP</span>
+          </button>
+        </div>
+
+        <!-- Row 2: Alpha and Memory Functions -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--alpha"
+            data-key="alpha"
+            data-primary="ALPHA"
+            aria-label="Alpha function"
+          >
+            <span class="btn__primary">ALPHA</span>
+          </button>
+          <button
+            class="btn btn--memory"
+            data-key="sto"
+            data-primary="STO▶"
+            aria-label="Store to memory"
+          >
+            <span class="btn__primary">STO▶</span>
+          </button>
+          <button
+            class="btn btn--memory"
+            data-key="rcl"
+            data-primary="RCL"
+            aria-label="Recall from memory"
+          >
+            <span class="btn__primary">RCL</span>
+          </button>
+          <button
+            class="btn btn--delete"
+            data-key="clear"
+            data-primary="CLEAR"
+            aria-label="Clear all"
+          >
+            <span class="btn__primary">CLEAR</span>
+          </button>
+          <button
+            class="btn btn--delete"
+            data-key="del"
+            data-primary="DEL"
+            aria-label="Delete last entry"
+          >
+            <span class="btn__primary">DEL</span>
+          </button>
+        </div>
+
+        <!-- Row 3: Scientific Functions -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--scientific"
+            data-key="x2"
+            data-primary="x²"
+            data-secondary="√"
+            aria-label="Square or square root"
+          >
+            <span class="btn__secondary">√</span>
+            <span class="btn__primary">x²</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="neg"
+            data-primary="(-)"
+            data-secondary="π"
+            aria-label="Negative or pi"
+          >
+            <span class="btn__secondary">π</span>
+            <span class="btn__primary">(-)</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="sin"
+            data-primary="sin"
+            data-secondary="sin⁻¹"
+            aria-label="Sine or inverse sine"
+          >
+            <span class="btn__secondary">sin⁻¹</span>
+            <span class="btn__primary">sin</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="cos"
+            data-primary="cos"
+            data-secondary="cos⁻¹"
+            aria-label="Cosine or inverse cosine"
+          >
+            <span class="btn__secondary">cos⁻¹</span>
+            <span class="btn__primary">cos</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="tan"
+            data-primary="tan"
+            data-secondary="tan⁻¹"
+            aria-label="Tangent or inverse tangent"
+          >
+            <span class="btn__secondary">tan⁻¹</span>
+            <span class="btn__primary">tan</span>
+          </button>
+        </div>
+
+        <!-- Row 4: Power and Log Functions -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--scientific"
+            data-key="1x"
+            data-primary="1/x"
+            data-secondary="nCr"
+            aria-label="Reciprocal or combination"
+          >
+            <span class="btn__secondary">nCr</span>
+            <span class="btn__primary">1/x</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="log"
+            data-primary="log"
+            data-secondary="10^x"
+            aria-label="Logarithm base 10 or 10 to the power x"
+          >
+            <span class="btn__secondary">10^x</span>
+            <span class="btn__primary">log</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="ln"
+            data-primary="ln"
+            data-secondary="e^x"
+            aria-label="Natural logarithm or e to the power x"
+          >
+            <span class="btn__secondary">e^x</span>
+            <span class="btn__primary">ln</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="xy"
+            data-primary="x^y"
+            data-secondary="y√x"
+            aria-label="X to the power Y or Y root of X"
+          >
+            <span class="btn__secondary">y√x</span>
+            <span class="btn__primary">x^y</span>
+          </button>
+          <button
+            class="btn btn--scientific"
+            data-key="ee"
+            data-primary="EE"
+            data-secondary="nPr"
+            aria-label="Scientific notation or permutation"
+          >
+            <span class="btn__secondary">nPr</span>
+            <span class="btn__primary">EE</span>
+          </button>
+        </div>
+
+        <!-- Row 5: Parentheses and Operations -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--operator"
+            data-key="leftparen"
+            data-primary="("
+            data-secondary="{"
+            aria-label="Left parenthesis or left brace"
+          >
+            <span class="btn__secondary">{</span>
+            <span class="btn__primary">(</span>
+          </button>
+          <button
+            class="btn btn--operator"
+            data-key="rightparen"
+            data-primary=")"
+            data-secondary="}"
+            aria-label="Right parenthesis or right brace"
+          >
+            <span class="btn__secondary">}</span>
+            <span class="btn__primary">)</span>
+          </button>
+          <button
+            class="btn btn--operator"
+            data-key="frac"
+            data-primary="a b/c"
+            data-secondary="¹/x"
+            aria-label="Fraction or reciprocal"
+          >
+            <span class="btn__secondary">¹/x</span>
+            <span class="btn__primary">a b/c</span>
+          </button>
+          <button
+            class="btn btn--operator"
+            data-key="percent"
+            data-primary="%"
+            data-secondary="%"
+            aria-label="Percent"
+          >
+            <span class="btn__primary">%</span>
+          </button>
+          <button
+            class="btn btn--operation"
+            data-key="divide"
+            data-primary="÷"
+            aria-label="Division"
+          >
+            <span class="btn__primary">÷</span>
+          </button>
+        </div>
+
+        <!-- Row 6: Numbers 7-9 and Multiply -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--number"
+            data-key="7"
+            data-primary="7"
+            aria-label="Seven"
+          >
+            <span class="btn__primary">7</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="8"
+            data-primary="8"
+            aria-label="Eight"
+          >
+            <span class="btn__primary">8</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="9"
+            data-primary="9"
+            aria-label="Nine"
+          >
+            <span class="btn__primary">9</span>
+          </button>
+          <button
+            class="btn btn--memory"
+            data-key="mplus"
+            data-primary="M+"
+            aria-label="Add to memory"
+          >
+            <span class="btn__primary">M+</span>
+          </button>
+          <button
+            class="btn btn--operation"
+            data-key="multiply"
+            data-primary="×"
+            aria-label="Multiplication"
+          >
+            <span class="btn__primary">×</span>
+          </button>
+        </div>
+
+        <!-- Row 7: Numbers 4-6 and Subtract -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--number"
+            data-key="4"
+            data-primary="4"
+            aria-label="Four"
+          >
+            <span class="btn__primary">4</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="5"
+            data-primary="5"
+            aria-label="Five"
+          >
+            <span class="btn__primary">5</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="6"
+            data-primary="6"
+            aria-label="Six"
+          >
+            <span class="btn__primary">6</span>
+          </button>
+          <button
+            class="btn btn--memory"
+            data-key="mminus"
+            data-primary="M-"
+            aria-label="Subtract from memory"
+          >
+            <span class="btn__primary">M-</span>
+          </button>
+          <button
+            class="btn btn--operation"
+            data-key="subtract"
+            data-primary="−"
+            aria-label="Subtraction"
+          >
+            <span class="btn__primary">−</span>
+          </button>
+        </div>
+
+        <!-- Row 8: Numbers 1-3 and Add -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--number"
+            data-key="1"
+            data-primary="1"
+            aria-label="One"
+          >
+            <span class="btn__primary">1</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="2"
+            data-primary="2"
+            aria-label="Two"
+          >
+            <span class="btn__primary">2</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="3"
+            data-primary="3"
+            aria-label="Three"
+          >
+            <span class="btn__primary">3</span>
+          </button>
+          <button
+            class="btn btn--navigation"
+            data-key="on"
+            data-primary="ON"
+            aria-label="Power on"
+          >
+            <span class="btn__primary">ON</span>
+          </button>
+          <button
+            class="btn btn--operation"
+            data-key="add"
+            data-primary="+"
+            aria-label="Addition"
+          >
+            <span class="btn__primary">+</span>
+          </button>
+        </div>
+
+        <!-- Row 9: Zero, Decimal and Enter -->
+        <div class="keypad__row" role="row">
+          <button
+            class="btn btn--number btn--zero"
+            data-key="0"
+            data-primary="0"
+            aria-label="Zero"
+          >
+            <span class="btn__primary">0</span>
+          </button>
+          <button
+            class="btn btn--number"
+            data-key="decimal"
+            data-primary="."
+            aria-label="Decimal point"
+          >
+            <span class="btn__primary">.</span>
+          </button>
+          <button
+            class="btn btn--navigation"
+            data-key="left"
+            data-primary="◀"
+            aria-label="Move cursor left"
+          >
+            <span class="btn__primary">◀</span>
+          </button>
+          <button
+            class="btn btn--navigation"
+            data-key="right"
+            data-primary="▶"
+            aria-label="Move cursor right"
+          >
+            <span class="btn__primary">▶</span>
+          </button>
+          <button
+            class="btn btn--enter"
+            data-key="enter"
+            data-primary="enter"
+            aria-label="Calculate result"
+          >
+            <span class="btn__primary">enter</span>
+          </button>
+        </div>
+      </main>
+
+      <!-- History Panel (hidden by default) -->
+      <aside
+        class="calculator__history"
+        id="history-panel"
+        aria-label="Calculation history"
+        hidden
+      >
+        <header class="history__header">
+          <h2>History</h2>
+          <button
+            class="btn btn--small"
+            id="clear-history"
+            aria-label="Clear calculation history"
+          >
+            Clear
+          </button>
+        </header>
+        <div
+          class="history__list"
+          id="history-list"
+          role="log"
+          aria-live="polite"
+        ></div>
+      </aside>
+    </div>
+
+    <!-- Screen Reader Announcements -->
+    <div
+      id="sr-announcements"
+      class="sr-only"
+      aria-live="assertive"
+      aria-atomic="true"
+    ></div>
+
+    <!-- Error Modal -->
+    <div
+      class="modal"
+      id="error-modal"
+      role="dialog"
+      aria-labelledby="error-title"
+      aria-describedby="error-message"
+      hidden
+    >
+      <div class="modal__backdrop"></div>
+      <div class="modal__content">
+        <header class="modal__header">
+          <h2 id="error-title">Calculator Error</h2>
+          <button class="modal__close" aria-label="Close error dialog">
+            &times;
+          </button>
+        </header>
+        <div class="modal__body">
+          <p id="error-message"></p>
+        </div>
+        <footer class="modal__footer">
+          <button class="btn btn--primary" id="error-ok">OK</button>
+        </footer>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

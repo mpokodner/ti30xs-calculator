@@ -42,8 +42,10 @@ const TI30XSCalculator = (function () {
     isInEE: false,
     isInConstant: false,
     constantValue: 0,
+    constantOperation: null,
     cursorPosition: 0,
     isInsertMode: false,
+    historyIndex: -1,
   };
 
   // DOM Elements
@@ -190,12 +192,12 @@ const TI30XSCalculator = (function () {
     elements.tanBtn.addEventListener("click", () => executeTrigFunction("tan"));
     elements.logBtn.addEventListener("click", () => executeLogFunction("log"));
     elements.lnBtn.addEventListener("click", () => executeLogFunction("ln"));
-    elements.piBtn.addEventListener("click", insertConstant);
-    elements.eBtn.addEventListener("click", insertConstant);
+    elements.piBtn.addEventListener("click", () => insertConstant("pi"));
+    elements.eBtn.addEventListener("click", () => insertConstant("e"));
     elements.factorialBtn.addEventListener("click", executeFactorial);
     elements.squareBtn.addEventListener("click", () => executePower(2));
     elements.cubeBtn.addEventListener("click", () => executePower(3));
-    elements.powerBtn.addEventListener("click", insertOperator);
+    elements.powerBtn.addEventListener("click", () => insertOperator("^"));
     elements.sqrtBtn.addEventListener("click", executeSquareRoot);
 
     // Fraction buttons
@@ -239,9 +241,16 @@ const TI30XSCalculator = (function () {
     elements.fixBtn.addEventListener("click", () => setDisplayMode("FIX"));
     elements.sciBtn.addEventListener("click", () => setDisplayMode("SCI"));
 
-    // Help panel
+    // Help panel - FIXED EVENT LISTENERS
     elements.helpBtn.addEventListener("click", openHelp);
     elements.helpCloseBtn.addEventListener("click", closeHelp);
+
+    // Close help panel when clicking outside
+    elements.helpPanel.addEventListener("click", function (e) {
+      if (e.target === elements.helpPanel) {
+        closeHelp();
+      }
+    });
 
     // Display click for focus
     elements.display.addEventListener("click", () => elements.display.focus());
@@ -258,6 +267,13 @@ const TI30XSCalculator = (function () {
 
     const key = event.key;
     const keyCode = event.keyCode;
+
+    // Close help panel with Escape
+    if (key === "Escape" && elements.helpPanel.classList.contains("show")) {
+      closeHelp();
+      event.preventDefault();
+      return;
+    }
 
     // Prevent default for calculator keys
     if (isCalculatorKey(key, keyCode)) {
@@ -360,44 +376,49 @@ const TI30XSCalculator = (function () {
   // Power functions
   function turnOn() {
     state.isOn = true;
-    state.entryLine = "";
-    state.resultLine = "";
     updateDisplay();
     updateIndicators();
-    showMessage("Calculator turned on");
   }
 
   function turnOff() {
     state.isOn = false;
     state.entryLine = "";
     state.resultLine = "";
+    state.isSecondMode = false;
+    state.isHypMode = false;
     updateDisplay();
     updateIndicators();
-    showMessage("Calculator turned off");
   }
 
   // Mode functions
   function toggleSecondMode() {
+    if (!state.isOn) return;
     state.isSecondMode = !state.isSecondMode;
     updateIndicators();
     updateButtonStates();
   }
 
   function toggleHypMode() {
+    if (!state.isOn) return;
     state.isHypMode = !state.isHypMode;
     updateIndicators();
     updateButtonStates();
   }
 
   function setDisplayMode(mode) {
+    if (!state.isOn) return;
     state.displayMode = mode;
     if (mode === "FIX") {
-      state.fixDecimals =
-        prompt("Enter number of decimal places (0-9):", "2") || 2;
-      state.fixDecimals = Math.max(0, Math.min(9, parseInt(state.fixDecimals)));
+      const decimals = prompt("Enter number of decimal places (0-9):", "2");
+      if (decimals !== null) {
+        state.fixDecimals = Math.max(0, Math.min(9, parseInt(decimals) || 2));
+      }
     }
     updateIndicators();
-    updateDisplay();
+    if (state.resultLine) {
+      state.resultLine = formatNumber(parseFloat(state.resultLine));
+      updateDisplay();
+    }
   }
 
   function setAngleMode(mode) {
@@ -414,13 +435,7 @@ const TI30XSCalculator = (function () {
       return;
     }
 
-    if (state.isInFractionMode) {
-      // Handle fraction input
-      insertFractionNumber(num);
-    } else {
-      state.entryLine += num;
-    }
-
+    state.entryLine += num;
     updateDisplay();
   }
 
@@ -434,20 +449,26 @@ const TI30XSCalculator = (function () {
       return;
     }
 
-    state.entryLine += ".";
+    if (state.entryLine === "" || isOperator(state.entryLine.slice(-1))) {
+      state.entryLine += "0.";
+    } else {
+      state.entryLine += ".";
+    }
     updateDisplay();
   }
 
   function insertNegative() {
     if (!state.isOn) return;
 
-    const currentNumber = getCurrentNumber();
-    if (currentNumber.startsWith("-")) {
-      // Remove negative
-      state.entryLine = state.entryLine.replace(/^-/, "");
+    if (state.entryLine === "") {
+      state.entryLine = "−";
     } else {
-      // Add negative
-      state.entryLine = "-" + state.entryLine;
+      // Toggle negative sign
+      if (state.entryLine.startsWith("−")) {
+        state.entryLine = state.entryLine.substring(1);
+      } else {
+        state.entryLine = "−" + state.entryLine;
+      }
     }
 
     updateDisplay();
@@ -456,55 +477,29 @@ const TI30XSCalculator = (function () {
   function insertOperator(operator) {
     if (!state.isOn) return;
 
-    // Handle special operators based on mode
-    if (state.isSecondMode) {
-      switch (operator) {
-        case "sin":
-          operator = "sin⁻¹";
-          break;
-        case "cos":
-          operator = "cos⁻¹";
-          break;
-        case "tan":
-          operator = "tan⁻¹";
-          break;
-        case "log":
-          operator = "10^x";
-          break;
-        case "ln":
-          operator = "e^x";
-          break;
-      }
+    // Don't add operator if entry is empty (except for minus)
+    if (state.entryLine === "" && operator !== "−") {
+      return;
     }
 
-    if (state.isHypMode) {
-      switch (operator) {
-        case "sin":
-          operator = "sinh";
-          break;
-        case "cos":
-          operator = "cosh";
-          break;
-        case "tan":
-          operator = "tanh";
-          break;
-      }
+    // Replace last operator if consecutive operators
+    const lastChar = state.entryLine.slice(-1);
+    if (isOperator(lastChar) && operator !== "(" && operator !== "−") {
+      state.entryLine = state.entryLine.slice(0, -1) + operator;
+    } else {
+      state.entryLine += operator;
     }
 
-    state.entryLine += operator;
     updateDisplay();
   }
 
-  function insertConstant() {
+  function insertConstant(type) {
     if (!state.isOn) return;
 
-    const constant = state.isSecondMode ? "e" : "π";
-    const value = constant === "π" ? PI : E;
-
-    if (state.isInFractionMode) {
-      insertFractionNumber(value.toString());
-    } else {
-      state.entryLine += constant;
+    if (type === "pi") {
+      state.entryLine += "π";
+    } else if (type === "e") {
+      state.entryLine += "e";
     }
 
     updateDisplay();
@@ -513,7 +508,7 @@ const TI30XSCalculator = (function () {
   function insertAnswer() {
     if (!state.isOn) return;
 
-    const answer = formatNumber(state.lastAnswer);
+    const answer = state.lastAnswer.toString();
     state.entryLine += answer;
     updateDisplay();
   }
@@ -521,8 +516,12 @@ const TI30XSCalculator = (function () {
   function insertEE() {
     if (!state.isOn) return;
 
+    if (state.entryLine === "" || isOperator(state.entryLine.slice(-1))) {
+      state.entryLine += "1E";
+    } else {
+      state.entryLine += "E";
+    }
     state.isInEE = true;
-    state.entryLine += "E";
     updateDisplay();
   }
 
@@ -533,7 +532,11 @@ const TI30XSCalculator = (function () {
     if (state.isSecondMode) {
       // Clear all memory and reset
       clearAllMemory();
+      state.entryLine = "";
+      state.resultLine = "";
       showMessage("All memory cleared");
+      state.isSecondMode = false;
+      updateIndicators();
     } else {
       // Clear current entry
       state.entryLine = "";
@@ -546,22 +549,16 @@ const TI30XSCalculator = (function () {
   function deleteCharacter() {
     if (!state.isOn) return;
 
-    if (state.isSecondMode) {
-      // Insert mode
-      toggleInsertMode();
-    } else {
-      // Delete character
-      if (state.entryLine.length > 0) {
-        state.entryLine = state.entryLine.slice(0, -1);
-      }
+    if (state.entryLine.length > 0) {
+      state.entryLine = state.entryLine.slice(0, -1);
+      updateDisplay();
     }
-
-    updateDisplay();
   }
 
   function toggleInsertMode() {
+    if (!state.isOn) return;
     state.isInsertMode = !state.isInsertMode;
-    updateIndicators();
+    showMessage(state.isInsertMode ? "Insert mode ON" : "Insert mode OFF");
   }
 
   function moveCursor(direction) {
@@ -578,18 +575,38 @@ const TI30XSCalculator = (function () {
   function navigateHistory(direction) {
     if (!state.isOn || state.history.length === 0) return;
 
-    // Implementation for history navigation
-    // This would require additional state management for history position
-    showMessage("History navigation not yet implemented");
+    if (direction === -1) {
+      // Up arrow
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex++;
+        const historyItem = state.history[state.historyIndex];
+        state.entryLine = historyItem.entry;
+        updateDisplay();
+      }
+    } else {
+      // Down arrow
+      if (state.historyIndex > 0) {
+        state.historyIndex--;
+        const historyItem = state.history[state.historyIndex];
+        state.entryLine = historyItem.entry;
+        updateDisplay();
+      } else if (state.historyIndex === 0) {
+        state.historyIndex = -1;
+        state.entryLine = "";
+        updateDisplay();
+      }
+    }
   }
 
   // Memory functions
   function storeValue() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
+    const value = state.resultLine
+      ? parseFloat(state.resultLine)
+      : parseFloat(state.entryLine) || 0;
     state.memory.M = value;
-    showMessage(`Stored ${formatNumber(value)}`);
+    showMessage(`Stored ${formatNumber(value)} in M`);
   }
 
   function recallValue() {
@@ -598,9 +615,11 @@ const TI30XSCalculator = (function () {
     if (state.isSecondMode) {
       // Show memory variables menu
       showMemoryVariables();
+      state.isSecondMode = false;
+      updateIndicators();
     } else {
       // Recall M
-      const value = formatNumber(state.memory.M);
+      const value = state.memory.M.toString();
       state.entryLine += value;
       updateDisplay();
     }
@@ -609,17 +628,21 @@ const TI30XSCalculator = (function () {
   function addToMemory() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
+    const value = state.resultLine
+      ? parseFloat(state.resultLine)
+      : parseFloat(state.entryLine) || 0;
     state.memory.M += value;
-    showMessage(`Added ${formatNumber(value)} to memory`);
+    showMessage(`M = ${formatNumber(state.memory.M)}`);
   }
 
   function subtractFromMemory() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
+    const value = state.resultLine
+      ? parseFloat(state.resultLine)
+      : parseFloat(state.entryLine) || 0;
     state.memory.M -= value;
-    showMessage(`Subtracted ${formatNumber(value)} from memory`);
+    showMessage(`M = ${formatNumber(state.memory.M)}`);
   }
 
   function clearAllMemory() {
@@ -635,188 +658,285 @@ const TI30XSCalculator = (function () {
     };
     state.lastAnswer = 0;
     state.history = [];
+    state.historyIndex = -1;
   }
 
   // Scientific functions
   function executeTrigFunction(func) {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
-    let result;
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
+      let result;
 
-    // Convert to radians if needed
-    const angleInRadians = convertAngleToRadians(value);
+      if (state.isSecondMode) {
+        // Inverse functions
+        switch (func) {
+          case "sin":
+            result = Math.asin(value);
+            break;
+          case "cos":
+            result = Math.acos(value);
+            break;
+          case "tan":
+            result = Math.atan(value);
+            break;
+        }
+        result = convertRadiansToAngle(result);
+        state.isSecondMode = false;
+      } else if (state.isHypMode) {
+        // Hyperbolic functions
+        const angleInRadians = convertAngleToRadians(value);
+        switch (func) {
+          case "sin":
+            result = Math.sinh(angleInRadians);
+            break;
+          case "cos":
+            result = Math.cosh(angleInRadians);
+            break;
+          case "tan":
+            result = Math.tanh(angleInRadians);
+            break;
+        }
+        state.isHypMode = false;
+      } else {
+        // Regular functions
+        const angleInRadians = convertAngleToRadians(value);
+        switch (func) {
+          case "sin":
+            result = Math.sin(angleInRadians);
+            break;
+          case "cos":
+            result = Math.cos(angleInRadians);
+            break;
+          case "tan":
+            result = Math.tan(angleInRadians);
+            break;
+        }
+      }
 
-    if (state.isSecondMode) {
-      // Inverse functions
-      switch (func) {
-        case "sin":
-          result = Math.asin(value);
-          break;
-        case "cos":
-          result = Math.acos(value);
-          break;
-        case "tan":
-          result = Math.atan(value);
-          break;
-      }
-      result = convertRadiansToAngle(result);
-    } else {
-      // Regular functions
-      switch (func) {
-        case "sin":
-          result = Math.sin(angleInRadians);
-          break;
-        case "cos":
-          result = Math.cos(angleInRadians);
-          break;
-        case "tan":
-          result = Math.tan(angleInRadians);
-          break;
-      }
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory(state.entryLine, state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+      updateIndicators();
+    } catch (error) {
+      showError("Invalid input");
     }
-
-    state.resultLine = formatNumber(result);
-    updateDisplay();
   }
 
   function executeLogFunction(func) {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
-    let result;
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
+      let result;
 
-    if (state.isSecondMode) {
-      // Inverse functions
-      switch (func) {
-        case "log":
-          result = Math.pow(10, value);
-          break;
-        case "ln":
-          result = Math.pow(E, value);
-          break;
+      if (state.isSecondMode) {
+        // Inverse functions
+        switch (func) {
+          case "log":
+            result = Math.pow(10, value);
+            break;
+          case "ln":
+            result = Math.pow(E, value);
+            break;
+        }
+        state.isSecondMode = false;
+      } else {
+        // Regular functions
+        switch (func) {
+          case "log":
+            result = Math.log10(value);
+            break;
+          case "ln":
+            result = Math.log(value);
+            break;
+        }
       }
-    } else {
-      // Regular functions
-      switch (func) {
-        case "log":
-          result = Math.log10(value);
-          break;
-        case "ln":
-          result = Math.log(value);
-          break;
-      }
+
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory(state.entryLine, state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+      updateIndicators();
+    } catch (error) {
+      showError("Invalid input");
     }
-
-    state.resultLine = formatNumber(result);
-    updateDisplay();
   }
 
   function executeFactorial() {
     if (!state.isOn) return;
 
-    const value = parseInt(state.resultLine) || 0;
+    try {
+      const value = state.entryLine
+        ? parseInt(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
 
-    if (value < 0 || value !== Math.floor(value)) {
-      showError("Invalid input for factorial");
-      return;
+      if (value < 0 || value !== Math.floor(value)) {
+        showError("Invalid input for factorial");
+        return;
+      }
+
+      if (value > 170) {
+        showError("Factorial too large");
+        return;
+      }
+
+      let result = 1;
+      for (let i = 2; i <= value; i++) {
+        result *= i;
+      }
+
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory(state.entryLine + "!", state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+    } catch (error) {
+      showError("Invalid input");
     }
-
-    if (value > 170) {
-      showError("Factorial too large");
-      return;
-    }
-
-    let result = 1;
-    for (let i = 2; i <= value; i++) {
-      result *= i;
-    }
-
-    state.resultLine = formatNumber(result);
-    updateDisplay();
   }
 
   function executePower(power) {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
-    const result = Math.pow(value, power);
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
+      const result = Math.pow(value, power);
 
-    state.resultLine = formatNumber(result);
-    updateDisplay();
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory(
+        state.entryLine + (power === 2 ? "²" : "³"),
+        state.resultLine
+      );
+      state.entryLine = "";
+      updateDisplay();
+    } catch (error) {
+      showError("Invalid input");
+    }
   }
 
   function executeSquareRoot() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
 
-    if (value < 0) {
-      showError("Invalid input for square root");
-      return;
+      if (value < 0) {
+        showError("Invalid input for square root");
+        return;
+      }
+
+      const result = Math.sqrt(value);
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory("√(" + state.entryLine + ")", state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+    } catch (error) {
+      showError("Invalid input");
     }
-
-    const result = Math.sqrt(value);
-    state.resultLine = formatNumber(result);
-    updateDisplay();
   }
 
   function executeReciprocal() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
 
-    if (value === 0) {
-      showError("Division by zero");
-      return;
+      if (value === 0) {
+        showError("Division by zero");
+        return;
+      }
+
+      const result = 1 / value;
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory("1/(" + state.entryLine + ")", state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+    } catch (error) {
+      showError("Invalid input");
     }
-
-    const result = 1 / value;
-    state.resultLine = formatNumber(result);
-    updateDisplay();
   }
 
   function executeAbsolute() {
     if (!state.isOn) return;
 
-    const value = parseFloat(state.resultLine) || 0;
-    const result = Math.abs(value);
+    try {
+      const value = state.entryLine
+        ? parseFloat(evaluateExpression(parseExpression(state.entryLine)))
+        : 0;
+      const result = Math.abs(value);
 
-    state.resultLine = formatNumber(result);
-    updateDisplay();
+      state.resultLine = formatNumber(result);
+      state.lastAnswer = result;
+      addToHistory("abs(" + state.entryLine + ")", state.resultLine);
+      state.entryLine = "";
+      updateDisplay();
+    } catch (error) {
+      showError("Invalid input");
+    }
   }
 
   // Fraction functions
   function toggleFractionMode() {
+    if (!state.isOn) return;
     state.isInFractionMode = !state.isInFractionMode;
+    showMessage(
+      state.isInFractionMode ? "Fraction mode ON" : "Fraction mode OFF"
+    );
     updateIndicators();
   }
 
   function toggleMixedMode() {
+    if (!state.isOn) return;
     state.isInMixedMode = !state.isInMixedMode;
+    showMessage(
+      state.isInMixedMode ? "Mixed number mode ON" : "Mixed number mode OFF"
+    );
     updateIndicators();
-  }
-
-  function insertFractionNumber(num) {
-    // Simplified fraction input
-    state.entryLine += num;
   }
 
   // Statistics functions
   function openStatistics() {
+    if (!state.isOn) return;
     showMessage("Statistics mode not yet implemented");
   }
 
   function openDataEditor() {
+    if (!state.isOn) return;
     showMessage("Data editor not yet implemented");
   }
 
   function openTableFunction() {
+    if (!state.isOn) return;
     showMessage("Table function not yet implemented");
   }
 
   function toggleConstant() {
+    if (!state.isOn) return;
     state.isInConstant = !state.isInConstant;
+    if (state.isInConstant && state.lastAnswer) {
+      state.constantValue = state.lastAnswer;
+      showMessage(`Constant K = ${formatNumber(state.constantValue)}`);
+    } else {
+      showMessage("Constant mode OFF");
+    }
     updateIndicators();
   }
 
@@ -837,6 +957,7 @@ const TI30XSCalculator = (function () {
         addToHistory(state.entryLine, state.resultLine);
 
         state.entryLine = "";
+        state.historyIndex = -1;
       } else {
         showError("Invalid calculation");
       }
@@ -855,19 +976,24 @@ const TI30XSCalculator = (function () {
       .replace(/÷/g, "/")
       .replace(/−/g, "-")
       .replace(/π/g, PI.toString())
-      .replace(/e/g, E.toString());
+      .replace(/e/g, E.toString())
+      .replace(/E/g, "e"); // Scientific notation
 
     return expr;
   }
 
   function evaluateExpression(expr) {
-    // Basic expression evaluation with PEMDAS
-    // This is a simplified version - a full implementation would need
-    // a proper expression parser for complex mathematical operations
+    // Basic expression evaluation with safety checks
+    // Remove any dangerous characters
+    const sanitizedExpr = expr.replace(/[^0-9+\-*/().,e]/g, "");
 
-    // For now, use eval with safety checks
-    const sanitizedExpr = expr.replace(/[^0-9+\-*/().,]/g, "");
-    return eval(sanitizedExpr);
+    try {
+      // Use Function constructor instead of eval for better safety
+      const result = new Function("return " + sanitizedExpr)();
+      return result;
+    } catch (error) {
+      throw new Error("Invalid expression");
+    }
   }
 
   // Utility functions
@@ -881,14 +1007,15 @@ const TI30XSCalculator = (function () {
         formatted = num.toFixed(state.fixDecimals);
         break;
       case "SCI":
-        formatted = num.toExponential(DISPLAY_PRECISION);
+        formatted = num.toExponential(state.fixDecimals);
         break;
       case "ENG":
         formatted = formatEngineering(num);
         break;
       default: // NORM
-        formatted = num.toString();
-        if (formatted.length > DISPLAY_PRECISION) {
+        if (Math.abs(num) < 1e-10 || Math.abs(num) > 1e10) {
+          formatted = num.toExponential(DISPLAY_PRECISION);
+        } else {
           formatted = parseFloat(num.toPrecision(DISPLAY_PRECISION)).toString();
         }
     }
@@ -897,10 +1024,16 @@ const TI30XSCalculator = (function () {
   }
 
   function formatEngineering(num) {
-    const exp = Math.floor(Math.log10(Math.abs(num)));
+    if (num === 0) return "0";
+
+    const sign = num < 0 ? -1 : 1;
+    num = Math.abs(num);
+
+    const exp = Math.floor(Math.log10(num));
     const engExp = Math.floor(exp / 3) * 3;
-    const mantissa = num / Math.pow(10, engExp);
-    return mantissa.toFixed(3) + "E" + engExp;
+    const mantissa = (sign * num) / Math.pow(10, engExp);
+
+    return mantissa.toFixed(state.fixDecimals) + "E" + engExp;
   }
 
   function convertAngleToRadians(angle) {
@@ -935,6 +1068,10 @@ const TI30XSCalculator = (function () {
     return match ? match[0] : "";
   }
 
+  function isOperator(char) {
+    return ["+", "−", "×", "÷", "^"].includes(char);
+  }
+
   function addToHistory(entry, result) {
     state.history.unshift({ entry, result });
     if (state.history.length > HISTORY_SIZE) {
@@ -947,10 +1084,12 @@ const TI30XSCalculator = (function () {
     if (!state.isOn) {
       elements.entryLine.textContent = "";
       elements.resultLine.textContent = "";
+      elements.historyLine1.textContent = "";
+      elements.historyLine2.textContent = "";
       return;
     }
 
-    elements.entryLine.textContent = state.entryLine;
+    elements.entryLine.textContent = state.entryLine || "0";
     elements.resultLine.textContent = state.resultLine;
 
     // Update history lines
@@ -960,6 +1099,23 @@ const TI30XSCalculator = (function () {
     } else {
       elements.historyLine1.textContent = "";
       elements.historyLine2.textContent = "";
+    }
+
+    // Update scroll indicators
+    updateScrollIndicators();
+  }
+
+  function updateScrollIndicators() {
+    const scrollLeft = document.getElementById("scroll-left");
+    const scrollRight = document.getElementById("scroll-right");
+
+    if (state.entryLine.length > MAX_DISPLAY_LENGTH) {
+      scrollLeft.style.opacity = state.cursorPosition > 0 ? "1" : "0.3";
+      scrollRight.style.opacity =
+        state.cursorPosition < state.entryLine.length ? "1" : "0.3";
+    } else {
+      scrollLeft.style.opacity = "0.3";
+      scrollRight.style.opacity = "0.3";
     }
   }
 
@@ -980,6 +1136,7 @@ const TI30XSCalculator = (function () {
       state.displayMode === "ENG"
     );
     elements.angleIndicator.textContent = state.angleMode;
+    elements.angleIndicator.classList.add("active");
     elements.kIndicator.classList.toggle("active", state.isInConstant);
   }
 
@@ -1000,21 +1157,23 @@ const TI30XSCalculator = (function () {
   }
 
   function showMessage(message) {
-    // Simple message display - could be enhanced with a toast notification
-    console.log(message);
+    // Use the error display for messages too, but with different styling
+    elements.errorDisplay.textContent = message;
+    elements.errorDisplay.style.background = "#4299e1";
+    elements.errorDisplay.hidden = false;
+
+    setTimeout(() => {
+      elements.errorDisplay.hidden = true;
+      elements.errorDisplay.style.background = ""; // Reset to default
+    }, 2000);
   }
 
   // Menu functions
   function openModeMenu() {
-    const modes = [
-      { name: "Number Format", options: ["NORM", "FIX", "SCI", "ENG"] },
-      { name: "Angle Unit", options: ["DEG", "RAD", "GRAD"] },
-      { name: "Display Format", options: ["MathPrint", "Classic"] },
-    ];
+    if (!state.isOn) return;
 
-    // Simplified mode menu - could be enhanced with a proper modal
     const mode = prompt(
-      "Select mode:\n1. Number Format\n2. Angle Unit\n3. Display Format"
+      "Select mode:\n1. Number Format (NORM/FIX/SCI/ENG)\n2. Angle Unit (DEG/RAD/GRAD)\n3. Display Format (MathPrint/Classic)"
     );
 
     switch (mode) {
@@ -1022,17 +1181,20 @@ const TI30XSCalculator = (function () {
         const numFormat = prompt(
           "Select number format:\n1. NORM\n2. FIX\n3. SCI\n4. ENG"
         );
-        const numFormats = ["NORM", "FIX", "SCI", "ENG"];
-        if (numFormat && numFormats[numFormat - 1]) {
-          setDisplayMode(numFormats[numFormat - 1]);
+        const numFormats = ["", "NORM", "FIX", "SCI", "ENG"];
+        if (numFormat && numFormats[parseInt(numFormat)]) {
+          setDisplayMode(numFormats[parseInt(numFormat)]);
         }
         break;
       case "2":
         const angleMode = prompt("Select angle unit:\n1. DEG\n2. RAD\n3. GRAD");
-        const angleModes = ["DEG", "RAD", "GRAD"];
-        if (angleMode && angleModes[angleMode - 1]) {
-          setAngleMode(angleModes[angleMode - 1]);
+        const angleModes = ["", "DEG", "RAD", "GRAD"];
+        if (angleMode && angleModes[parseInt(angleMode)]) {
+          setAngleMode(angleModes[parseInt(angleMode)]);
         }
+        break;
+      case "3":
+        showMessage("Display format not yet implemented");
         break;
     }
   }
@@ -1045,12 +1207,23 @@ const TI30XSCalculator = (function () {
     alert(`Memory Variables:\n${varList}`);
   }
 
+  // Help panel functions - FIXED
   function openHelp() {
     elements.helpPanel.classList.add("show");
+    elements.helpPanel.setAttribute("aria-hidden", "false");
+
+    // Focus on close button for accessibility
+    setTimeout(() => {
+      elements.helpCloseBtn.focus();
+    }, 100);
   }
 
   function closeHelp() {
     elements.helpPanel.classList.remove("show");
+    elements.helpPanel.setAttribute("aria-hidden", "true");
+
+    // Return focus to calculator
+    elements.display.focus();
   }
 
   // Public API
@@ -1091,6 +1264,8 @@ const TI30XSCalculator = (function () {
     navigateHistory: navigateHistory,
     showError: showError,
     showMessage: showMessage,
+    openHelp: openHelp,
+    closeHelp: closeHelp,
     getState: () => ({ ...state }),
     getMemory: () => ({ ...state.memory }),
   };

@@ -1046,11 +1046,11 @@ const TI30XSCalculator = (function () {
   }
 
   function openHelp() {
-    elements.helpPanel.hidden = false;
+    elements.helpPanel.classList.add("show");
   }
 
   function closeHelp() {
-    elements.helpPanel.hidden = true;
+    elements.helpPanel.classList.remove("show");
   }
 
   // Public API

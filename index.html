@@ -18,6 +18,9 @@
         role="application"
         aria-label="TI-30XS MultiView Scientific Calculator"
       >
+        <!-- Solar Panel -->
+        <div class="solar-panel" aria-hidden="true"></div>
+
         <!-- Display Section -->
         <div class="display-section">
           <!-- Status Indicators -->
@@ -29,7 +32,7 @@
             <span class="indicator" id="eng-indicator">ENG</span>
             <span class="indicator" id="angle-indicator">DEG</span>
             <span class="indicator" id="k-indicator">K</span>
-            <span class="indicator" id="list-indicator">L1</span>
+            <span class="indicator" id="stat-indicator">STAT</span>
           </div>
 
           <!-- Main Display -->
@@ -60,368 +63,224 @@
               aria-label="History line 2"
             ></div>
           </div>
-
-          <!-- Scroll Indicators -->
-          <div class="scroll-indicators" aria-hidden="true">
-            <span class="scroll-arrow" id="scroll-left">◀</span>
-            <span class="scroll-arrow" id="scroll-right">▶</span>
-          </div>
         </div>
 
         <!-- Button Grid -->
         <div class="button-grid" role="group" aria-label="Calculator buttons">
-          <!-- Row 1: ON, OFF, 2nd, Mode -->
+          <!-- Row 1 -->
           <button
-            class="btn btn-secondary"
-            id="on-btn"
-            aria-label="Turn calculator on"
-          >
-            ON
-          </button>
-          <button
-            class="btn btn-secondary"
-            id="off-btn"
-            aria-label="Turn calculator off"
-          >
-            OFF
-          </button>
-          <button
-            class="btn btn-secondary"
+            class="btn btn-green"
             id="second-btn"
             aria-label="Second function"
           >
-            2nd
+            <span class="btn-label">2nd</span>
           </button>
-          <button
-            class="btn btn-secondary"
-            id="mode-btn"
-            aria-label="Mode settings"
-          >
-            MODE
+          <button class="btn btn-mode" id="mode-btn" aria-label="Mode settings">
+            <span class="btn-secondary">quit</span>
+            <span class="btn-label">mode</span>
           </button>
+          <button class="btn btn-mode" id="delete-btn" aria-label="Delete">
+            <span class="btn-secondary">insert</span>
+            <span class="btn-label">delete</span>
+          </button>
+          <div class="nav-circle">
+            <button class="nav-btn" id="up-btn" aria-label="Up">▲</button>
+            <button class="nav-btn" id="left-btn" aria-label="Left">◄</button>
+            <button class="nav-btn" id="right-btn" aria-label="Right">►</button>
+            <button class="nav-btn" id="down-btn" aria-label="Down">▼</button>
+          </div>
 
-          <!-- Row 2: Clear, Delete, Insert, Ans -->
-          <button
-            class="btn btn-secondary"
-            id="clear-btn"
-            aria-label="Clear entry"
-          >
-            CLEAR
-          </button>
-          <button
-            class="btn btn-secondary"
-            id="delete-btn"
-            aria-label="Delete character"
-          >
-            DEL
-          </button>
-          <button
-            class="btn btn-secondary"
-            id="insert-btn"
-            aria-label="Insert mode"
-          >
-            INS
-          </button>
-          <button
-            class="btn btn-secondary"
-            id="ans-btn"
-            aria-label="Previous answer"
-          >
-            Ans
-          </button>
-
-          <!-- Row 3: Memory Functions -->
-          <button class="btn btn-memory" id="sto-btn" aria-label="Store value">
-            STO→
-          </button>
-          <button class="btn btn-memory" id="rcl-btn" aria-label="Recall value">
-            RCL
-          </button>
-          <button
-            class="btn btn-memory"
-            id="m-plus-btn"
-            aria-label="Add to memory"
-          >
-            M+
-          </button>
-          <button
-            class="btn btn-memory"
-            id="m-minus-btn"
-            aria-label="Subtract from memory"
-          >
-            M-
-          </button>
-
-          <!-- Row 4: Scientific Functions -->
-          <button class="btn btn-scientific" id="sin-btn" aria-label="Sine">
-            sin
-          </button>
-          <button class="btn btn-scientific" id="cos-btn" aria-label="Cosine">
-            cos
-          </button>
-          <button class="btn btn-scientific" id="tan-btn" aria-label="Tangent">
-            tan
+          <!-- Row 2 -->
+          <button class="btn btn-alpha" id="alpha-btn" aria-label="Alpha">
+            <span class="btn-secondary">F3</span>
+            <span class="btn-label">alpha</span>
           </button>
           <button
             class="btn btn-scientific"
-            id="log-btn"
-            aria-label="Logarithm base 10"
+            id="x-var-btn"
+            aria-label="X variable"
           >
-            log
-          </button>
-
-          <!-- Row 5: More Scientific Functions -->
-          <button
-            class="btn btn-scientific"
-            id="ln-btn"
-            aria-label="Natural logarithm"
-          >
-            ln
+            <span class="btn-secondary">angle</span>
+            <span class="btn-label">x-var</span>
           </button>
           <button
             class="btn btn-scientific"
-            id="pi-btn"
-            aria-label="Pi constant"
-          >
-            π
-          </button>
-          <button
-            class="btn btn-scientific"
-            id="e-btn"
-            aria-label="Euler's number"
-          >
-            e
-          </button>
-          <button
-            class="btn btn-scientific"
-            id="factorial-btn"
-            aria-label="Factorial"
-          >
-            x!
-          </button>
-
-          <!-- Row 6: Powers and Roots -->
-          <button
-            class="btn btn-scientific"
-            id="square-btn"
-            aria-label="Square"
-          >
-            x²
-          </button>
-          <button class="btn btn-scientific" id="cube-btn" aria-label="Cube">
-            x³
-          </button>
-          <button class="btn btn-scientific" id="power-btn" aria-label="Power">
-            ^
-          </button>
-          <button
-            class="btn btn-scientific"
-            id="sqrt-btn"
-            aria-label="Square root"
-          >
-            √
-          </button>
-
-          <!-- Row 7: Fractions and Mixed Numbers -->
-          <button
-            class="btn btn-fraction"
-            id="fraction-btn"
-            aria-label="Fraction"
-          >
-            n/d
-          </button>
-          <button
-            class="btn btn-fraction"
-            id="mixed-btn"
-            aria-label="Mixed number"
-          >
-            U n/d
-          </button>
-          <button
-            class="btn btn-fraction"
-            id="reciprocal-btn"
-            aria-label="Reciprocal"
-          >
-            x⁻¹
-          </button>
-          <button
-            class="btn btn-fraction"
-            id="abs-btn"
-            aria-label="Absolute value"
-          >
-            abs
-          </button>
-
-          <!-- Row 8: Statistics -->
-          <button
-            class="btn btn-statistics"
             id="stat-btn"
             aria-label="Statistics"
           >
-            STAT
-          </button>
-          <button
-            class="btn btn-statistics"
-            id="data-btn"
-            aria-label="Data editor"
-          >
-            DATA
-          </button>
-          <button
-            class="btn btn-statistics"
-            id="table-btn"
-            aria-label="Table function"
-          >
-            TABLE
-          </button>
-          <button
-            class="btn btn-statistics"
-            id="const-btn"
-            aria-label="Constant"
-          >
-            CONST
+            <span class="btn-secondary">stat</span>
+            <span class="btn-label">stat</span>
           </button>
 
-          <!-- Row 9: Numbers 7, 8, 9, Division -->
-          <button class="btn btn-number" id="btn-7" aria-label="Seven">
-            7
+          <!-- Row 3 -->
+          <button class="btn btn-scientific" id="math-btn" aria-label="Math">
+            <span class="btn-secondary">test</span>
+            <span class="btn-label">math</span>
           </button>
-          <button class="btn btn-number" id="btn-8" aria-label="Eight">
-            8
+          <button
+            class="btn btn-scientific"
+            id="apps-btn"
+            aria-label="Applications"
+          >
+            <span class="btn-secondary">char</span>
+            <span class="btn-label">apps</span>
           </button>
-          <button class="btn btn-number" id="btn-9" aria-label="Nine">9</button>
+          <button class="btn btn-scientific" id="prgm-btn" aria-label="Program">
+            <span class="btn-label">prgm</span>
+          </button>
+          <button class="btn btn-secondary" id="clear-btn" aria-label="Clear">
+            <span class="btn-label">clear</span>
+          </button>
+
+          <!-- Row 4 -->
+          <button
+            class="btn btn-function"
+            id="x-inverse-btn"
+            aria-label="X inverse"
+          >
+            <span class="btn-secondary">abs</span>
+            <span class="btn-label">x⁻¹</span>
+          </button>
+          <button class="btn btn-trig" id="sin-btn" aria-label="Sine">
+            <span class="btn-secondary">sin⁻¹</span>
+            <span class="btn-label">sin</span>
+          </button>
+          <button class="btn btn-trig" id="cos-btn" aria-label="Cosine">
+            <span class="btn-secondary">cos⁻¹</span>
+            <span class="btn-label">cos</span>
+          </button>
+          <button class="btn btn-trig" id="tan-btn" aria-label="Tangent">
+            <span class="btn-secondary">tan⁻¹</span>
+            <span class="btn-label">tan</span>
+          </button>
           <button class="btn btn-operation" id="divide-btn" aria-label="Divide">
-            ÷
+            <span class="btn-secondary">e</span>
+            <span class="btn-label">÷</span>
           </button>
 
-          <!-- Row 10: Numbers 4, 5, 6, Multiplication -->
-          <button class="btn btn-number" id="btn-4" aria-label="Four">4</button>
-          <button class="btn btn-number" id="btn-5" aria-label="Five">5</button>
-          <button class="btn btn-number" id="btn-6" aria-label="Six">6</button>
+          <!-- Row 5 -->
+          <button class="btn btn-function" id="square-btn" aria-label="Square">
+            <span class="btn-secondary">√</span>
+            <span class="btn-label">x²</span>
+          </button>
+          <button class="btn btn-function" id="power-btn" aria-label="Power">
+            <span class="btn-secondary">ˣ√</span>
+            <span class="btn-label">^</span>
+          </button>
+          <button class="btn btn-function" id="log-btn" aria-label="Logarithm">
+            <span class="btn-secondary">10ˣ</span>
+            <span class="btn-label">log</span>
+          </button>
+          <button class="btn btn-function" id="ln-btn" aria-label="Natural log">
+            <span class="btn-secondary">eˣ</span>
+            <span class="btn-label">ln</span>
+          </button>
           <button
             class="btn btn-operation"
             id="multiply-btn"
             aria-label="Multiply"
           >
-            ×
+            <span class="btn-secondary">π</span>
+            <span class="btn-label">×</span>
           </button>
 
-          <!-- Row 11: Numbers 1, 2, 3, Subtraction -->
-          <button class="btn btn-number" id="btn-1" aria-label="One">1</button>
-          <button class="btn btn-number" id="btn-2" aria-label="Two">2</button>
-          <button class="btn btn-number" id="btn-3" aria-label="Three">
-            3
+          <!-- Row 6 -->
+          <button class="btn btn-function" id="sto-btn" aria-label="Store">
+            <span class="btn-secondary">recall</span>
+            <span class="btn-label">sto→</span>
+          </button>
+          <button class="btn btn-number" id="btn-7" aria-label="Seven">
+            <span class="btn-secondary">y-var</span>
+            <span class="btn-label">7</span>
+          </button>
+          <button class="btn btn-number" id="btn-8" aria-label="Eight">
+            <span class="btn-secondary">table</span>
+            <span class="btn-label">8</span>
+          </button>
+          <button class="btn btn-number" id="btn-9" aria-label="Nine">
+            <span class="btn-secondary">graph</span>
+            <span class="btn-label">9</span>
           </button>
           <button
             class="btn btn-operation"
             id="subtract-btn"
             aria-label="Subtract"
           >
-            −
+            <span class="btn-secondary">ans</span>
+            <span class="btn-label">−</span>
           </button>
 
-          <!-- Row 12: Number 0, Decimal, Negative, Addition -->
-          <button class="btn btn-number" id="btn-0" aria-label="Zero">0</button>
+          <!-- Row 7 -->
+          <button class="btn btn-special" id="on-btn" aria-label="On">
+            <span class="btn-secondary">off</span>
+            <span class="btn-label">on</span>
+          </button>
+          <button class="btn btn-number" id="btn-4" aria-label="Four">
+            <span class="btn-secondary">L1</span>
+            <span class="btn-label">4</span>
+          </button>
+          <button class="btn btn-number" id="btn-5" aria-label="Five">
+            <span class="btn-secondary">L2</span>
+            <span class="btn-label">5</span>
+          </button>
+          <button class="btn btn-number" id="btn-6" aria-label="Six">
+            <span class="btn-secondary">L3</span>
+            <span class="btn-label">6</span>
+          </button>
+          <button class="btn btn-operation" id="add-btn" aria-label="Add">
+            <span class="btn-secondary">entry</span>
+            <span class="btn-label">+</span>
+          </button>
+
+          <!-- Row 8 -->
+          <button class="btn btn-special" id="data-btn" aria-label="Data">
+            <span class="btn-secondary">[</span>
+            <span class="btn-label">data</span>
+          </button>
+          <button class="btn btn-number" id="btn-1" aria-label="One">
+            <span class="btn-secondary">L4</span>
+            <span class="btn-label">1</span>
+          </button>
+          <button class="btn btn-number" id="btn-2" aria-label="Two">
+            <span class="btn-secondary">L5</span>
+            <span class="btn-label">2</span>
+          </button>
+          <button class="btn btn-number" id="btn-3" aria-label="Three">
+            <span class="btn-secondary">L6</span>
+            <span class="btn-label">3</span>
+          </button>
           <button
-            class="btn btn-number"
-            id="decimal-btn"
-            aria-label="Decimal point"
+            class="btn btn-special large-btn"
+            id="enter-btn"
+            aria-label="Enter"
+            rowspan="2"
           >
-            .
+            <span class="btn-secondary">solve</span>
+            <span class="btn-label">enter</span>
+          </button>
+
+          <!-- Row 9 -->
+          <button class="btn btn-number large-btn" id="btn-0" aria-label="Zero">
+            <span class="btn-secondary">reset</span>
+            <span class="btn-label">0</span>
+          </button>
+          <button class="btn btn-number" id="decimal-btn" aria-label="Decimal">
+            <span class="btn-secondary">i</span>
+            <span class="btn-label">.</span>
           </button>
           <button
             class="btn btn-number"
             id="negative-btn"
-            aria-label="Negative sign"
+            aria-label="Negative"
           >
-            (−)
-          </button>
-          <button class="btn btn-operation" id="add-btn" aria-label="Add">
-            +
-          </button>
-
-          <!-- Row 13: Parentheses, EE, Enter, Equals -->
-          <button
-            class="btn btn-operation"
-            id="left-paren-btn"
-            aria-label="Left parenthesis"
-          >
-            (
-          </button>
-          <button
-            class="btn btn-operation"
-            id="right-paren-btn"
-            aria-label="Right parenthesis"
-          >
-            )
-          </button>
-          <button
-            class="btn btn-operation"
-            id="ee-btn"
-            aria-label="Scientific notation"
-          >
-            EE
-          </button>
-          <button class="btn btn-equals" id="equals-btn" aria-label="Equals">
-            =
-          </button>
-
-          <!-- Row 14: Navigation and Special -->
-          <button
-            class="btn btn-navigation"
-            id="left-arrow-btn"
-            aria-label="Left arrow"
-          >
-            ◀
-          </button>
-          <button
-            class="btn btn-navigation"
-            id="right-arrow-btn"
-            aria-label="Right arrow"
-          >
-            ▶
-          </button>
-          <button
-            class="btn btn-navigation"
-            id="up-arrow-btn"
-            aria-label="Up arrow"
-          >
-            ▲
-          </button>
-          <button
-            class="btn btn-navigation"
-            id="down-arrow-btn"
-            aria-label="Down arrow"
-          >
-            ▼
-          </button>
-
-          <!-- Row 15: Additional Functions -->
-          <button class="btn btn-special" id="hyp-btn" aria-label="Hyperbolic">
-            HYP
-          </button>
-          <button
-            class="btn btn-special"
-            id="fix-btn"
-            aria-label="Fixed decimal"
-          >
-            FIX
-          </button>
-          <button
-            class="btn btn-special"
-            id="sci-btn"
-            aria-label="Scientific notation"
-          >
-            SCI
-          </button>
-          <button class="btn btn-special" id="help-btn" aria-label="Help">
-            HELP
+            <span class="btn-secondary">!</span>
+            <span class="btn-label">(−)</span>
           </button>
         </div>
 
         <!-- Branding -->
         <div class="branding" aria-hidden="true">
-          <span class="brand-text">Texas Instruments</span>
+          <span class="brand-text">TEXAS INSTRUMENTS</span>
           <span class="model-text">TI-30XS MultiView™</span>
         </div>
       </div>
@@ -454,13 +313,15 @@
           <div class="help-section">
             <h3>Scientific Functions</h3>
             <p>
-              Press 2nd to access secondary functions. Use trig functions in
-              DEG, RAD, or GRAD modes.
+              Press 2nd (green button) to access secondary functions shown in
+              green above each button.
             </p>
           </div>
           <div class="help-section">
             <h3>Memory</h3>
-            <p>Use STO→ to store values and RCL to recall them.</p>
+            <p>
+              Use STO→ to store values and 2nd + STO→ (recall) to recall them.
+            </p>
           </div>
           <button
             class="help-close-btn"

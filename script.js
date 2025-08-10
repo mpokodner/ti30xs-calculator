@@ -19,7 +19,7 @@ const TI30XSCalculator = (function () {
   let state = {
     isOn: false,
     isSecondMode: false,
-    isHypMode: false,
+    isAlphaMode: false,
     angleMode: "DEG", // DEG, RAD, GRAD
     displayMode: "NORM", // NORM, FIX, SCI, ENG
     fixDecimals: 2,
@@ -36,16 +36,19 @@ const TI30XSCalculator = (function () {
       b: 0,
       c: 0,
     },
+    lists: {
+      L1: [],
+      L2: [],
+      L3: [],
+      L4: [],
+      L5: [],
+      L6: [],
+    },
     lastAnswer: 0,
-    isInFractionMode: false,
-    isInMixedMode: false,
-    isInEE: false,
-    isInConstant: false,
-    constantValue: 0,
-    constantOperation: null,
     cursorPosition: 0,
     isInsertMode: false,
     historyIndex: -1,
+    isInStatMode: false,
   };
 
   // DOM Elements
@@ -78,76 +81,54 @@ const TI30XSCalculator = (function () {
       engIndicator: document.getElementById("eng-indicator"),
       angleIndicator: document.getElementById("angle-indicator"),
       kIndicator: document.getElementById("k-indicator"),
-      listIndicator: document.getElementById("list-indicator"),
+      statIndicator: document.getElementById("stat-indicator"),
 
-      // Buttons
-      onBtn: document.getElementById("on-btn"),
-      offBtn: document.getElementById("off-btn"),
+      // Main buttons
       secondBtn: document.getElementById("second-btn"),
       modeBtn: document.getElementById("mode-btn"),
-      clearBtn: document.getElementById("clear-btn"),
       deleteBtn: document.getElementById("delete-btn"),
-      insertBtn: document.getElementById("insert-btn"),
-      ansBtn: document.getElementById("ans-btn"),
 
-      // Memory buttons
-      stoBtn: document.getElementById("sto-btn"),
-      rclBtn: document.getElementById("rcl-btn"),
-      mPlusBtn: document.getElementById("m-plus-btn"),
-      mMinusBtn: document.getElementById("m-minus-btn"),
+      // Navigation buttons
+      upBtn: document.getElementById("up-btn"),
+      downBtn: document.getElementById("down-btn"),
+      leftBtn: document.getElementById("left-btn"),
+      rightBtn: document.getElementById("right-btn"),
+
+      // Function buttons
+      alphaBtn: document.getElementById("alpha-btn"),
+      xVarBtn: document.getElementById("x-var-btn"),
+      statBtn: document.getElementById("stat-btn"),
+      mathBtn: document.getElementById("math-btn"),
+      appsBtn: document.getElementById("apps-btn"),
+      prgmBtn: document.getElementById("prgm-btn"),
+      clearBtn: document.getElementById("clear-btn"),
 
       // Scientific buttons
+      xInverseBtn: document.getElementById("x-inverse-btn"),
       sinBtn: document.getElementById("sin-btn"),
       cosBtn: document.getElementById("cos-btn"),
       tanBtn: document.getElementById("tan-btn"),
+      squareBtn: document.getElementById("square-btn"),
+      powerBtn: document.getElementById("power-btn"),
       logBtn: document.getElementById("log-btn"),
       lnBtn: document.getElementById("ln-btn"),
-      piBtn: document.getElementById("pi-btn"),
-      eBtn: document.getElementById("e-btn"),
-      factorialBtn: document.getElementById("factorial-btn"),
-      squareBtn: document.getElementById("square-btn"),
-      cubeBtn: document.getElementById("cube-btn"),
-      powerBtn: document.getElementById("power-btn"),
-      sqrtBtn: document.getElementById("sqrt-btn"),
-
-      // Fraction buttons
-      fractionBtn: document.getElementById("fraction-btn"),
-      mixedBtn: document.getElementById("mixed-btn"),
-      reciprocalBtn: document.getElementById("reciprocal-btn"),
-      absBtn: document.getElementById("abs-btn"),
-
-      // Statistics buttons
-      statBtn: document.getElementById("stat-btn"),
-      dataBtn: document.getElementById("data-btn"),
-      tableBtn: document.getElementById("table-btn"),
-      constBtn: document.getElementById("const-btn"),
+      stoBtn: document.getElementById("sto-btn"),
 
       // Number buttons
       numberBtns: {},
 
       // Operation buttons
-      addBtn: document.getElementById("add-btn"),
-      subtractBtn: document.getElementById("subtract-btn"),
-      multiplyBtn: document.getElementById("multiply-btn"),
       divideBtn: document.getElementById("divide-btn"),
-      equalsBtn: document.getElementById("equals-btn"),
+      multiplyBtn: document.getElementById("multiply-btn"),
+      subtractBtn: document.getElementById("subtract-btn"),
+      addBtn: document.getElementById("add-btn"),
+      enterBtn: document.getElementById("enter-btn"),
       decimalBtn: document.getElementById("decimal-btn"),
       negativeBtn: document.getElementById("negative-btn"),
-      leftParenBtn: document.getElementById("left-paren-btn"),
-      rightParenBtn: document.getElementById("right-paren-btn"),
-      eeBtn: document.getElementById("ee-btn"),
-
-      // Navigation buttons
-      leftArrowBtn: document.getElementById("left-arrow-btn"),
-      rightArrowBtn: document.getElementById("right-arrow-btn"),
-      upArrowBtn: document.getElementById("up-arrow-btn"),
-      downArrowBtn: document.getElementById("down-arrow-btn"),
 
       // Special buttons
-      hypBtn: document.getElementById("hyp-btn"),
-      fixBtn: document.getElementById("fix-btn"),
-      sciBtn: document.getElementById("sci-btn"),
-      helpBtn: document.getElementById("help-btn"),
+      onBtn: document.getElementById("on-btn"),
+      dataBtn: document.getElementById("data-btn"),
 
       // Error display
       errorDisplay: document.getElementById("error-display"),
@@ -165,92 +146,89 @@ const TI30XSCalculator = (function () {
 
   // Setup event listeners
   function setupEventListeners() {
-    // Power buttons
-    elements.onBtn.addEventListener("click", turnOn);
-    elements.offBtn.addEventListener("click", turnOff);
+    // Power button
+    elements.onBtn.addEventListener("click", handleOnButton);
 
-    // Mode buttons
+    // 2nd button
     elements.secondBtn.addEventListener("click", toggleSecondMode);
-    elements.modeBtn.addEventListener("click", openModeMenu);
-    elements.hypBtn.addEventListener("click", toggleHypMode);
 
-    // Clear and edit buttons
+    // Mode and delete buttons
+    elements.modeBtn.addEventListener("click", handleModeButton);
+    elements.deleteBtn.addEventListener("click", handleDeleteButton);
+
+    // Navigation buttons
+    elements.upBtn.addEventListener("click", () => navigateHistory(-1));
+    elements.downBtn.addEventListener("click", () => navigateHistory(1));
+    elements.leftBtn.addEventListener("click", () => moveCursor(-1));
+    elements.rightBtn.addEventListener("click", () => moveCursor(1));
+
+    // Clear button
     elements.clearBtn.addEventListener("click", clearEntry);
-    elements.deleteBtn.addEventListener("click", deleteCharacter);
-    elements.insertBtn.addEventListener("click", toggleInsertMode);
-    elements.ansBtn.addEventListener("click", insertAnswer);
-
-    // Memory buttons
-    elements.stoBtn.addEventListener("click", storeValue);
-    elements.rclBtn.addEventListener("click", recallValue);
-    elements.mPlusBtn.addEventListener("click", addToMemory);
-    elements.mMinusBtn.addEventListener("click", subtractFromMemory);
 
     // Scientific function buttons
-    elements.sinBtn.addEventListener("click", () => executeTrigFunction("sin"));
-    elements.cosBtn.addEventListener("click", () => executeTrigFunction("cos"));
-    elements.tanBtn.addEventListener("click", () => executeTrigFunction("tan"));
-    elements.logBtn.addEventListener("click", () => executeLogFunction("log"));
-    elements.lnBtn.addEventListener("click", () => executeLogFunction("ln"));
-    elements.piBtn.addEventListener("click", () => insertConstant("pi"));
-    elements.eBtn.addEventListener("click", () => insertConstant("e"));
-    elements.factorialBtn.addEventListener("click", executeFactorial);
-    elements.squareBtn.addEventListener("click", () => executePower(2));
-    elements.cubeBtn.addEventListener("click", () => executePower(3));
-    elements.powerBtn.addEventListener("click", () => insertOperator("^"));
-    elements.sqrtBtn.addEventListener("click", executeSquareRoot);
+    elements.sinBtn.addEventListener("click", () => handleTrigButton("sin"));
+    elements.cosBtn.addEventListener("click", () => handleTrigButton("cos"));
+    elements.tanBtn.addEventListener("click", () => handleTrigButton("tan"));
+    elements.logBtn.addEventListener("click", () => handleLogButton("log"));
+    elements.lnBtn.addEventListener("click", () => handleLogButton("ln"));
+    elements.xInverseBtn.addEventListener("click", () =>
+      handleXInverseButton()
+    );
+    elements.squareBtn.addEventListener("click", () => handleSquareButton());
+    elements.powerBtn.addEventListener("click", () => handlePowerButton());
 
-    // Fraction buttons
-    elements.fractionBtn.addEventListener("click", toggleFractionMode);
-    elements.mixedBtn.addEventListener("click", toggleMixedMode);
-    elements.reciprocalBtn.addEventListener("click", executeReciprocal);
-    elements.absBtn.addEventListener("click", executeAbsolute);
-
-    // Statistics buttons
-    elements.statBtn.addEventListener("click", openStatistics);
-    elements.dataBtn.addEventListener("click", openDataEditor);
-    elements.tableBtn.addEventListener("click", openTableFunction);
-    elements.constBtn.addEventListener("click", toggleConstant);
+    // Memory button
+    elements.stoBtn.addEventListener("click", () => handleStoButton());
 
     // Number buttons
     Object.keys(elements.numberBtns).forEach((num) => {
       elements.numberBtns[num].addEventListener("click", () =>
-        insertNumber(num)
+        handleNumberButton(num)
       );
     });
 
     // Operation buttons
-    elements.addBtn.addEventListener("click", () => insertOperator("+"));
-    elements.subtractBtn.addEventListener("click", () => insertOperator("−"));
-    elements.multiplyBtn.addEventListener("click", () => insertOperator("×"));
-    elements.divideBtn.addEventListener("click", () => insertOperator("÷"));
-    elements.equalsBtn.addEventListener("click", calculate);
-    elements.decimalBtn.addEventListener("click", insertDecimal);
-    elements.negativeBtn.addEventListener("click", insertNegative);
-    elements.leftParenBtn.addEventListener("click", () => insertOperator("("));
-    elements.rightParenBtn.addEventListener("click", () => insertOperator(")"));
-    elements.eeBtn.addEventListener("click", insertEE);
+    elements.divideBtn.addEventListener("click", () =>
+      handleOperationButton("÷")
+    );
+    elements.multiplyBtn.addEventListener("click", () =>
+      handleOperationButton("×")
+    );
+    elements.subtractBtn.addEventListener("click", () =>
+      handleOperationButton("−")
+    );
+    elements.addBtn.addEventListener("click", () => handleOperationButton("+"));
+    elements.enterBtn.addEventListener("click", () => handleEnterButton());
+    elements.decimalBtn.addEventListener("click", () => handleDecimalButton());
+    elements.negativeBtn.addEventListener("click", () =>
+      handleNegativeButton()
+    );
 
-    // Navigation buttons
-    elements.leftArrowBtn.addEventListener("click", () => moveCursor(-1));
-    elements.rightArrowBtn.addEventListener("click", () => moveCursor(1));
-    elements.upArrowBtn.addEventListener("click", () => navigateHistory(-1));
-    elements.downArrowBtn.addEventListener("click", () => navigateHistory(1));
+    // Alpha button
+    elements.alphaBtn.addEventListener("click", toggleAlphaMode);
 
-    // Display format buttons
-    elements.fixBtn.addEventListener("click", () => setDisplayMode("FIX"));
-    elements.sciBtn.addEventListener("click", () => setDisplayMode("SCI"));
+    // Stat button
+    elements.statBtn.addEventListener("click", handleStatButton);
 
-    // Help panel - FIXED EVENT LISTENERS
-    elements.helpBtn.addEventListener("click", openHelp);
-    elements.helpCloseBtn.addEventListener("click", closeHelp);
+    // Data button
+    elements.dataBtn.addEventListener("click", handleDataButton);
 
-    // Close help panel when clicking outside
+    // x-var button
+    elements.xVarBtn.addEventListener("click", handleXVarButton);
+
+    // Math button
+    elements.mathBtn.addEventListener("click", handleMathButton);
+
+    // Apps button
+    elements.appsBtn.addEventListener("click", handleAppsButton);
+
+    // Help panel
     elements.helpPanel.addEventListener("click", function (e) {
       if (e.target === elements.helpPanel) {
         closeHelp();
       }
     });
+    elements.helpCloseBtn.addEventListener("click", closeHelp);
 
     // Display click for focus
     elements.display.addEventListener("click", () => elements.display.focus());
@@ -266,7 +244,6 @@ const TI30XSCalculator = (function () {
     if (!state.isOn) return;
 
     const key = event.key;
-    const keyCode = event.keyCode;
 
     // Close help panel with Escape
     if (key === "Escape" && elements.helpPanel.classList.contains("show")) {
@@ -276,45 +253,39 @@ const TI30XSCalculator = (function () {
     }
 
     // Prevent default for calculator keys
-    if (isCalculatorKey(key, keyCode)) {
+    if (isCalculatorKey(key)) {
       event.preventDefault();
     }
 
     // Number keys
     if (key >= "0" && key <= "9") {
-      insertNumber(key);
+      handleNumberButton(key);
     }
     // Decimal
     else if (key === ".") {
-      insertDecimal();
+      handleDecimalButton();
     }
     // Operators
     else if (key === "+") {
-      insertOperator("+");
+      handleOperationButton("+");
     } else if (key === "-") {
-      insertOperator("−");
+      handleOperationButton("−");
     } else if (key === "*") {
-      insertOperator("×");
+      handleOperationButton("×");
     } else if (key === "/") {
-      insertOperator("÷");
+      handleOperationButton("÷");
     } else if (key === "^") {
-      insertOperator("^");
-    }
-    // Parentheses
-    else if (key === "(") {
-      insertOperator("(");
-    } else if (key === ")") {
-      insertOperator(")");
+      handlePowerButton();
     }
     // Enter/Equals
     else if (key === "Enter" || key === "=") {
-      calculate();
+      handleEnterButton();
     }
-    // Backspace
-    else if (key === "Backspace") {
-      deleteCharacter();
+    // Backspace/Delete
+    else if (key === "Backspace" || key === "Delete") {
+      handleDeleteButton();
     }
-    // Escape
+    // Escape/Clear
     else if (key === "Escape") {
       clearEntry();
     }
@@ -328,18 +299,10 @@ const TI30XSCalculator = (function () {
     } else if (key === "ArrowDown") {
       navigateHistory(1);
     }
-    // Home/End
-    else if (key === "Home") {
-      state.cursorPosition = 0;
-      updateDisplay();
-    } else if (key === "End") {
-      state.cursorPosition = state.entryLine.length;
-      updateDisplay();
-    }
   }
 
   // Check if key is a calculator key
-  function isCalculatorKey(key, keyCode) {
+  function isCalculatorKey(key) {
     const calculatorKeys = [
       "0",
       "1",
@@ -357,20 +320,322 @@ const TI30XSCalculator = (function () {
       "*",
       "/",
       "^",
-      "(",
-      ")",
       "=",
       "Enter",
       "Backspace",
+      "Delete",
       "Escape",
       "ArrowLeft",
       "ArrowRight",
       "ArrowUp",
       "ArrowDown",
-      "Home",
-      "End",
     ];
     return calculatorKeys.includes(key);
+  }
+
+  // Button handlers
+  function handleOnButton() {
+    if (!state.isOn) {
+      turnOn();
+    } else if (state.isSecondMode) {
+      // 2nd + ON = OFF
+      turnOff();
+      state.isSecondMode = false;
+      updateIndicators();
+    }
+  }
+
+  function handleModeButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + MODE = QUIT
+      quitCurrentMode();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      openModeMenu();
+    }
+  }
+
+  function handleDeleteButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + DELETE = INSERT
+      toggleInsertMode();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      deleteCharacter();
+    }
+  }
+
+  function handleNumberButton(num) {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Handle secondary functions for number buttons
+      switch (num) {
+        case "0":
+          // 2nd + 0 = RESET
+          resetCalculator();
+          break;
+        case "1":
+          // 2nd + 1 = L4
+          insertList("L4");
+          break;
+        case "2":
+          // 2nd + 2 = L5
+          insertList("L5");
+          break;
+        case "3":
+          // 2nd + 3 = L6
+          insertList("L6");
+          break;
+        case "4":
+          // 2nd + 4 = L1
+          insertList("L1");
+          break;
+        case "5":
+          // 2nd + 5 = L2
+          insertList("L2");
+          break;
+        case "6":
+          // 2nd + 6 = L3
+          insertList("L3");
+          break;
+        case "7":
+          // 2nd + 7 = y-var
+          insertVariable("y");
+          break;
+        case "8":
+          // 2nd + 8 = table
+          openTableFunction();
+          break;
+        case "9":
+          // 2nd + 9 = graph
+          showMessage("Graph function not available");
+          break;
+      }
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertNumber(num);
+    }
+  }
+
+  function handleTrigButton(func) {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Inverse trig functions
+      executeTrigFunction(func, true);
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      executeTrigFunction(func, false);
+    }
+  }
+
+  function handleLogButton(func) {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 10^x or e^x
+      executeLogFunction(func, true);
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      executeLogFunction(func, false);
+    }
+  }
+
+  function handleSquareButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Square root
+      executeSquareRoot();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      // Square
+      executePower(2);
+    }
+  }
+
+  function handlePowerButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // nth root
+      insertOperator("ˣ√");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertOperator("^");
+    }
+  }
+
+  function handleXInverseButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Absolute value
+      executeAbsolute();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      executeReciprocal();
+    }
+  }
+
+  function handleStoButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Recall
+      recallValue();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      storeValue();
+    }
+  }
+
+  function handleOperationButton(op) {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      switch (op) {
+        case "÷":
+          // 2nd + ÷ = e
+          insertConstant("e");
+          break;
+        case "×":
+          // 2nd + × = π
+          insertConstant("pi");
+          break;
+        case "−":
+          // 2nd + − = ANS
+          insertAnswer();
+          break;
+        case "+":
+          // 2nd + + = entry
+          showMessage("Entry function not implemented");
+          break;
+      }
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertOperator(op);
+    }
+  }
+
+  function handleEnterButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + ENTER = SOLVE
+      showMessage("Solve function not implemented");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      calculate();
+    }
+  }
+
+  function handleDecimalButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + . = i (imaginary unit)
+      insertConstant("i");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertDecimal();
+    }
+  }
+
+  function handleNegativeButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + (−) = ! (factorial)
+      executeFactorial();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertNegative();
+    }
+  }
+
+  function handleStatButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + STAT = stat menu
+      openStatisticsMenu();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      // Regular stat mode
+      toggleStatMode();
+    }
+  }
+
+  function handleDataButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + DATA = [
+      insertOperator("[");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      openDataEditor();
+    }
+  }
+
+  function handleXVarButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + x-var = angle
+      showAngleMenu();
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      insertVariable("x");
+    }
+  }
+
+  function handleMathButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + MATH = TEST
+      showMessage("Test menu not implemented");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      showMathMenu();
+    }
+  }
+
+  function handleAppsButton() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // 2nd + APPS = CHAR
+      showMessage("Character menu not implemented");
+      state.isSecondMode = false;
+      updateIndicators();
+    } else {
+      showAppsMenu();
+    }
   }
 
   // Power functions
@@ -385,7 +650,7 @@ const TI30XSCalculator = (function () {
     state.entryLine = "";
     state.resultLine = "";
     state.isSecondMode = false;
-    state.isHypMode = false;
+    state.isAlphaMode = false;
     updateDisplay();
     updateIndicators();
   }
@@ -398,32 +663,24 @@ const TI30XSCalculator = (function () {
     updateButtonStates();
   }
 
-  function toggleHypMode() {
+  function toggleAlphaMode() {
     if (!state.isOn) return;
-    state.isHypMode = !state.isHypMode;
-    updateIndicators();
-    updateButtonStates();
+    state.isAlphaMode = !state.isAlphaMode;
+    showMessage(state.isAlphaMode ? "Alpha mode ON" : "Alpha mode OFF");
   }
 
-  function setDisplayMode(mode) {
+  function toggleStatMode() {
     if (!state.isOn) return;
-    state.displayMode = mode;
-    if (mode === "FIX") {
-      const decimals = prompt("Enter number of decimal places (0-9):", "2");
-      if (decimals !== null) {
-        state.fixDecimals = Math.max(0, Math.min(9, parseInt(decimals) || 2));
-      }
-    }
+    state.isInStatMode = !state.isInStatMode;
     updateIndicators();
-    if (state.resultLine) {
-      state.resultLine = formatNumber(parseFloat(state.resultLine));
-      updateDisplay();
-    }
+    showMessage(state.isInStatMode ? "STAT mode ON" : "STAT mode OFF");
   }
 
-  function setAngleMode(mode) {
-    state.angleMode = mode;
+  function quitCurrentMode() {
+    state.isInStatMode = false;
+    state.isAlphaMode = false;
     updateIndicators();
+    showMessage("Quit to home");
   }
 
   // Input functions
@@ -442,7 +699,6 @@ const TI30XSCalculator = (function () {
   function insertDecimal() {
     if (!state.isOn) return;
 
-    // Check if current number already has a decimal
     const currentNumber = getCurrentNumber();
     if (currentNumber.includes(".")) {
       showError("Decimal already exists");
@@ -496,32 +752,37 @@ const TI30XSCalculator = (function () {
   function insertConstant(type) {
     if (!state.isOn) return;
 
-    if (type === "pi") {
-      state.entryLine += "π";
-    } else if (type === "e") {
-      state.entryLine += "e";
+    switch (type) {
+      case "pi":
+        state.entryLine += "π";
+        break;
+      case "e":
+        state.entryLine += "e";
+        break;
+      case "i":
+        state.entryLine += "i";
+        break;
     }
 
+    updateDisplay();
+  }
+
+  function insertVariable(varName) {
+    if (!state.isOn) return;
+    state.entryLine += varName;
+    updateDisplay();
+  }
+
+  function insertList(listName) {
+    if (!state.isOn) return;
+    state.entryLine += listName;
     updateDisplay();
   }
 
   function insertAnswer() {
     if (!state.isOn) return;
-
     const answer = state.lastAnswer.toString();
     state.entryLine += answer;
-    updateDisplay();
-  }
-
-  function insertEE() {
-    if (!state.isOn) return;
-
-    if (state.entryLine === "" || isOperator(state.entryLine.slice(-1))) {
-      state.entryLine += "1E";
-    } else {
-      state.entryLine += "E";
-    }
-    state.isInEE = true;
     updateDisplay();
   }
 
@@ -529,20 +790,8 @@ const TI30XSCalculator = (function () {
   function clearEntry() {
     if (!state.isOn) return;
 
-    if (state.isSecondMode) {
-      // Clear all memory and reset
-      clearAllMemory();
-      state.entryLine = "";
-      state.resultLine = "";
-      showMessage("All memory cleared");
-      state.isSecondMode = false;
-      updateIndicators();
-    } else {
-      // Clear current entry
-      state.entryLine = "";
-      state.resultLine = "";
-    }
-
+    state.entryLine = "";
+    state.resultLine = "";
     updateDisplay();
   }
 
@@ -558,7 +807,7 @@ const TI30XSCalculator = (function () {
   function toggleInsertMode() {
     if (!state.isOn) return;
     state.isInsertMode = !state.isInsertMode;
-    showMessage(state.isInsertMode ? "Insert mode ON" : "Insert mode OFF");
+    showMessage(state.isInsertMode ? "Insert mode ON" : "Overwrite mode");
   }
 
   function moveCursor(direction) {
@@ -571,7 +820,6 @@ const TI30XSCalculator = (function () {
     }
   }
 
-  // Navigation functions
   function navigateHistory(direction) {
     if (!state.isOn || state.history.length === 0) return;
 
@@ -612,57 +860,13 @@ const TI30XSCalculator = (function () {
   function recallValue() {
     if (!state.isOn) return;
 
-    if (state.isSecondMode) {
-      // Show memory variables menu
-      showMemoryVariables();
-      state.isSecondMode = false;
-      updateIndicators();
-    } else {
-      // Recall M
-      const value = state.memory.M.toString();
-      state.entryLine += value;
-      updateDisplay();
-    }
-  }
-
-  function addToMemory() {
-    if (!state.isOn) return;
-
-    const value = state.resultLine
-      ? parseFloat(state.resultLine)
-      : parseFloat(state.entryLine) || 0;
-    state.memory.M += value;
-    showMessage(`M = ${formatNumber(state.memory.M)}`);
-  }
-
-  function subtractFromMemory() {
-    if (!state.isOn) return;
-
-    const value = state.resultLine
-      ? parseFloat(state.resultLine)
-      : parseFloat(state.entryLine) || 0;
-    state.memory.M -= value;
-    showMessage(`M = ${formatNumber(state.memory.M)}`);
-  }
-
-  function clearAllMemory() {
-    state.memory = {
-      M: 0,
-      x: 0,
-      y: 0,
-      z: 0,
-      t: 0,
-      a: 0,
-      b: 0,
-      c: 0,
-    };
-    state.lastAnswer = 0;
-    state.history = [];
-    state.historyIndex = -1;
+    const value = state.memory.M.toString();
+    state.entryLine += value;
+    updateDisplay();
   }
 
   // Scientific functions
-  function executeTrigFunction(func) {
+  function executeTrigFunction(func, isInverse = false) {
     if (!state.isOn) return;
 
     try {
@@ -671,7 +875,7 @@ const TI30XSCalculator = (function () {
         : 0;
       let result;
 
-      if (state.isSecondMode) {
+      if (isInverse) {
         // Inverse functions
         switch (func) {
           case "sin":
@@ -685,22 +889,6 @@ const TI30XSCalculator = (function () {
             break;
         }
         result = convertRadiansToAngle(result);
-        state.isSecondMode = false;
-      } else if (state.isHypMode) {
-        // Hyperbolic functions
-        const angleInRadians = convertAngleToRadians(value);
-        switch (func) {
-          case "sin":
-            result = Math.sinh(angleInRadians);
-            break;
-          case "cos":
-            result = Math.cosh(angleInRadians);
-            break;
-          case "tan":
-            result = Math.tanh(angleInRadians);
-            break;
-        }
-        state.isHypMode = false;
       } else {
         // Regular functions
         const angleInRadians = convertAngleToRadians(value);
@@ -722,13 +910,12 @@ const TI30XSCalculator = (function () {
       addToHistory(state.entryLine, state.resultLine);
       state.entryLine = "";
       updateDisplay();
-      updateIndicators();
     } catch (error) {
       showError("Invalid input");
     }
   }
 
-  function executeLogFunction(func) {
+  function executeLogFunction(func, isInverse = false) {
     if (!state.isOn) return;
 
     try {
@@ -737,7 +924,7 @@ const TI30XSCalculator = (function () {
         : 0;
       let result;
 
-      if (state.isSecondMode) {
+      if (isInverse) {
         // Inverse functions
         switch (func) {
           case "log":
@@ -747,7 +934,6 @@ const TI30XSCalculator = (function () {
             result = Math.pow(E, value);
             break;
         }
-        state.isSecondMode = false;
       } else {
         // Regular functions
         switch (func) {
@@ -765,7 +951,6 @@ const TI30XSCalculator = (function () {
       addToHistory(state.entryLine, state.resultLine);
       state.entryLine = "";
       updateDisplay();
-      updateIndicators();
     } catch (error) {
       showError("Invalid input");
     }
@@ -893,51 +1078,121 @@ const TI30XSCalculator = (function () {
     }
   }
 
-  // Fraction functions
-  function toggleFractionMode() {
-    if (!state.isOn) return;
-    state.isInFractionMode = !state.isInFractionMode;
-    showMessage(
-      state.isInFractionMode ? "Fraction mode ON" : "Fraction mode OFF"
+  // Menu functions
+  function openModeMenu() {
+    const mode = prompt(
+      "Select mode:\n1. Number Format (NORM/FIX/SCI/ENG)\n2. Angle Unit (DEG/RAD/GRAD)"
     );
+
+    switch (mode) {
+      case "1":
+        const numFormat = prompt(
+          "Select number format:\n1. NORM\n2. FIX\n3. SCI\n4. ENG"
+        );
+        const numFormats = ["", "NORM", "FIX", "SCI", "ENG"];
+        if (numFormat && numFormats[parseInt(numFormat)]) {
+          setDisplayMode(numFormats[parseInt(numFormat)]);
+        }
+        break;
+      case "2":
+        const angleMode = prompt("Select angle unit:\n1. DEG\n2. RAD\n3. GRAD");
+        const angleModes = ["", "DEG", "RAD", "GRAD"];
+        if (angleMode && angleModes[parseInt(angleMode)]) {
+          setAngleMode(angleModes[parseInt(angleMode)]);
+        }
+        break;
+    }
+  }
+
+  function setDisplayMode(mode) {
+    if (!state.isOn) return;
+    state.displayMode = mode;
+    if (mode === "FIX") {
+      const decimals = prompt("Enter number of decimal places (0-9):", "2");
+      if (decimals !== null) {
+        state.fixDecimals = Math.max(0, Math.min(9, parseInt(decimals) || 2));
+      }
+    }
+    updateIndicators();
+    if (state.resultLine) {
+      state.resultLine = formatNumber(parseFloat(state.resultLine));
+      updateDisplay();
+    }
+  }
+
+  function setAngleMode(mode) {
+    state.angleMode = mode;
     updateIndicators();
   }
 
-  function toggleMixedMode() {
-    if (!state.isOn) return;
-    state.isInMixedMode = !state.isInMixedMode;
-    showMessage(
-      state.isInMixedMode ? "Mixed number mode ON" : "Mixed number mode OFF"
-    );
-    updateIndicators();
+  function showAngleMenu() {
+    const angle = prompt("Select angle unit:\n1. DEG\n2. RAD\n3. GRAD");
+    const angleModes = ["", "DEG", "RAD", "GRAD"];
+    if (angle && angleModes[parseInt(angle)]) {
+      setAngleMode(angleModes[parseInt(angle)]);
+    }
   }
 
-  // Statistics functions
-  function openStatistics() {
-    if (!state.isOn) return;
-    showMessage("Statistics mode not yet implemented");
+  function showMathMenu() {
+    showMessage("Math menu not implemented");
+  }
+
+  function showAppsMenu() {
+    showMessage("Apps menu not implemented");
+  }
+
+  function openStatisticsMenu() {
+    showMessage("Statistics menu not implemented");
   }
 
   function openDataEditor() {
-    if (!state.isOn) return;
-    showMessage("Data editor not yet implemented");
+    showMessage("Data editor not implemented");
   }
 
   function openTableFunction() {
-    if (!state.isOn) return;
-    showMessage("Table function not yet implemented");
+    showMessage("Table function not implemented");
   }
 
-  function toggleConstant() {
-    if (!state.isOn) return;
-    state.isInConstant = !state.isInConstant;
-    if (state.isInConstant && state.lastAnswer) {
-      state.constantValue = state.lastAnswer;
-      showMessage(`Constant K = ${formatNumber(state.constantValue)}`);
-    } else {
-      showMessage("Constant mode OFF");
+  function resetCalculator() {
+    if (confirm("Reset all memory and settings?")) {
+      state = {
+        isOn: true,
+        isSecondMode: false,
+        isAlphaMode: false,
+        angleMode: "DEG",
+        displayMode: "NORM",
+        fixDecimals: 2,
+        entryLine: "",
+        resultLine: "",
+        history: [],
+        memory: {
+          M: 0,
+          x: 0,
+          y: 0,
+          z: 0,
+          t: 0,
+          a: 0,
+          b: 0,
+          c: 0,
+        },
+        lists: {
+          L1: [],
+          L2: [],
+          L3: [],
+          L4: [],
+          L5: [],
+          L6: [],
+        },
+        lastAnswer: 0,
+        cursorPosition: 0,
+        isInsertMode: false,
+        historyIndex: -1,
+        isInStatMode: false,
+      };
+      updateDisplay();
+      updateIndicators();
+      showMessage("Calculator reset");
     }
-    updateIndicators();
   }
 
   // Calculation functions
@@ -945,7 +1200,6 @@ const TI30XSCalculator = (function () {
     if (!state.isOn || !state.entryLine) return;
 
     try {
-      // Parse and evaluate expression
       const expression = parseExpression(state.entryLine);
       const result = evaluateExpression(expression);
 
@@ -1100,29 +1354,12 @@ const TI30XSCalculator = (function () {
       elements.historyLine1.textContent = "";
       elements.historyLine2.textContent = "";
     }
-
-    // Update scroll indicators
-    updateScrollIndicators();
-  }
-
-  function updateScrollIndicators() {
-    const scrollLeft = document.getElementById("scroll-left");
-    const scrollRight = document.getElementById("scroll-right");
-
-    if (state.entryLine.length > MAX_DISPLAY_LENGTH) {
-      scrollLeft.style.opacity = state.cursorPosition > 0 ? "1" : "0.3";
-      scrollRight.style.opacity =
-        state.cursorPosition < state.entryLine.length ? "1" : "0.3";
-    } else {
-      scrollLeft.style.opacity = "0.3";
-      scrollRight.style.opacity = "0.3";
-    }
   }
 
   function updateIndicators() {
     // Update status indicators
     elements.secondIndicator.classList.toggle("active", state.isSecondMode);
-    elements.hypIndicator.classList.toggle("active", state.isHypMode);
+    elements.hypIndicator.classList.toggle("active", false); // HYP not implemented
     elements.fixIndicator.classList.toggle(
       "active",
       state.displayMode === "FIX"
@@ -1137,13 +1374,13 @@ const TI30XSCalculator = (function () {
     );
     elements.angleIndicator.textContent = state.angleMode;
     elements.angleIndicator.classList.add("active");
-    elements.kIndicator.classList.toggle("active", state.isInConstant);
+    elements.kIndicator.classList.toggle("active", false); // K not implemented
+    elements.statIndicator.classList.toggle("active", state.isInStatMode);
   }
 
   function updateButtonStates() {
     // Update button visual states based on modes
     elements.secondBtn.classList.toggle("secondary-active", state.isSecondMode);
-    elements.hypBtn.classList.toggle("hyp-active", state.isHypMode);
   }
 
   // Error and message functions
@@ -1168,46 +1405,7 @@ const TI30XSCalculator = (function () {
     }, 2000);
   }
 
-  // Menu functions
-  function openModeMenu() {
-    if (!state.isOn) return;
-
-    const mode = prompt(
-      "Select mode:\n1. Number Format (NORM/FIX/SCI/ENG)\n2. Angle Unit (DEG/RAD/GRAD)\n3. Display Format (MathPrint/Classic)"
-    );
-
-    switch (mode) {
-      case "1":
-        const numFormat = prompt(
-          "Select number format:\n1. NORM\n2. FIX\n3. SCI\n4. ENG"
-        );
-        const numFormats = ["", "NORM", "FIX", "SCI", "ENG"];
-        if (numFormat && numFormats[parseInt(numFormat)]) {
-          setDisplayMode(numFormats[parseInt(numFormat)]);
-        }
-        break;
-      case "2":
-        const angleMode = prompt("Select angle unit:\n1. DEG\n2. RAD\n3. GRAD");
-        const angleModes = ["", "DEG", "RAD", "GRAD"];
-        if (angleMode && angleModes[parseInt(angleMode)]) {
-          setAngleMode(angleModes[parseInt(angleMode)]);
-        }
-        break;
-      case "3":
-        showMessage("Display format not yet implemented");
-        break;
-    }
-  }
-
-  function showMemoryVariables() {
-    const variables = Object.keys(state.memory);
-    const varList = variables
-      .map((v) => `${v}: ${formatNumber(state.memory[v])}`)
-      .join("\n");
-    alert(`Memory Variables:\n${varList}`);
-  }
-
-  // Help panel functions - FIXED
+  // Help panel functions
   function openHelp() {
     elements.helpPanel.classList.add("show");
     elements.helpPanel.setAttribute("aria-hidden", "false");
@@ -1229,43 +1427,6 @@ const TI30XSCalculator = (function () {
   // Public API
   return {
     init: init,
-    turnOn: turnOn,
-    turnOff: turnOff,
-    calculate: calculate,
-    clearEntry: clearEntry,
-    deleteCharacter: deleteCharacter,
-    insertNumber: insertNumber,
-    insertOperator: insertOperator,
-    insertDecimal: insertDecimal,
-    insertNegative: insertNegative,
-    toggleSecondMode: toggleSecondMode,
-    toggleHypMode: toggleHypMode,
-    setDisplayMode: setDisplayMode,
-    setAngleMode: setAngleMode,
-    storeValue: storeValue,
-    recallValue: recallValue,
-    addToMemory: addToMemory,
-    subtractFromMemory: subtractFromMemory,
-    executeTrigFunction: executeTrigFunction,
-    executeLogFunction: executeLogFunction,
-    executeFactorial: executeFactorial,
-    executePower: executePower,
-    executeSquareRoot: executeSquareRoot,
-    executeReciprocal: executeReciprocal,
-    executeAbsolute: executeAbsolute,
-    toggleFractionMode: toggleFractionMode,
-    toggleMixedMode: toggleMixedMode,
-    toggleConstant: toggleConstant,
-    openStatistics: openStatistics,
-    openDataEditor: openDataEditor,
-    openTableFunction: openTableFunction,
-    openModeMenu: openModeMenu,
-    moveCursor: moveCursor,
-    navigateHistory: navigateHistory,
-    showError: showError,
-    showMessage: showMessage,
-    openHelp: openHelp,
-    closeHelp: closeHelp,
     getState: () => ({ ...state }),
     getMemory: () => ({ ...state.memory }),
   };

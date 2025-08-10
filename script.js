@@ -1,1183 +1,1107 @@
 /**
  * TI-30XS MultiView Scientific Calculator
- * A fully functional scientific calculator with authentic TI-30XS features
- *
- * Author: Senior Frontend Developer
- * License: Educational Use
+ * A comprehensive web-based replica of the Texas Instruments calculator
  */
 
-"use strict";
+// Calculator Module Pattern
+const TI30XSCalculator = (function () {
+  "use strict";
 
-/**
- * Calculator Engine Module
- * Handles all mathematical operations and state management
- */
-const CalculatorEngine = (() => {
-  // Private state variables
-  let currentExpression = "";
-  let currentResult = "";
-  let memory = 0;
-  let isRadianMode = false; // Default to degree mode
-  let is2ndFunction = false;
-  let isAlphaFunction = false;
-  let calculationHistory = [];
-  let cursorPosition = 0;
-  let lastAnswer = 0;
+  // Constants
+  const PI = Math.PI;
+  const E = Math.E;
+  const MAX_DISPLAY_LENGTH = 16;
+  const MAX_PRECISION = 13;
+  const DISPLAY_PRECISION = 10;
+  const HISTORY_SIZE = 8;
 
-  // Mathematical constants
-  const CONSTANTS = {
-    PI: Math.PI,
-    E: Math.E,
-    MAX_DIGITS: 12,
-    MAX_EXPRESSION_LENGTH: 200,
-    EPSILON: 1e-10,
+  // Calculator State
+  let state = {
+    isOn: false,
+    isSecondMode: false,
+    isHypMode: false,
+    angleMode: "DEG", // DEG, RAD, GRAD
+    displayMode: "NORM", // NORM, FIX, SCI, ENG
+    fixDecimals: 2,
+    entryLine: "",
+    resultLine: "",
+    history: [],
+    memory: {
+      M: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      t: 0,
+      a: 0,
+      b: 0,
+      c: 0,
+    },
+    lastAnswer: 0,
+    isInFractionMode: false,
+    isInMixedMode: false,
+    isInEE: false,
+    isInConstant: false,
+    constantValue: 0,
+    cursorPosition: 0,
+    isInsertMode: false,
   };
 
-  // Error types
-  const ERRORS = {
-    SYNTAX_ERROR: "SYNTAX ERROR",
-    MATH_ERROR: "MATH ERROR",
-    OVERFLOW: "OVERFLOW",
-    DOMAIN_ERROR: "DOMAIN ERROR",
-    DIVIDE_BY_ZERO: "DIVIDE BY ZERO",
-  };
-
-  /**
-   * Mathematical utility functions
-   */
-  const MathUtils = {
-    // Convert degrees to radians
-    degToRad: (degrees) => degrees * (Math.PI / 180),
-
-    // Convert radians to degrees
-    radToDeg: (radians) => radians * (180 / Math.PI),
-
-    // Factorial function
-    factorial: (n) => {
-      if (n < 0 || !Number.isInteger(n)) throw new Error(ERRORS.DOMAIN_ERROR);
-      if (n > 170) throw new Error(ERRORS.OVERFLOW);
-      if (n === 0 || n === 1) return 1;
-
-      let result = 1;
-      for (let i = 2; i <= n; i++) {
-        result *= i;
-      }
-      return result;
-    },
-
-    // Combination function nCr
-    combination: (n, r) => {
-      if (n < 0 || r < 0 || !Number.isInteger(n) || !Number.isInteger(r)) {
-        throw new Error(ERRORS.DOMAIN_ERROR);
-      }
-      if (r > n) return 0;
-      if (r === 0 || r === n) return 1;
-
-      r = Math.min(r, n - r); // Take advantage of symmetry
-      let result = 1;
-      for (let i = 0; i < r; i++) {
-        result *= (n - i) / (i + 1);
-      }
-      return Math.round(result);
-    },
-
-    // Permutation function nPr
-    permutation: (n, r) => {
-      if (n < 0 || r < 0 || !Number.isInteger(n) || !Number.isInteger(r)) {
-        throw new Error(ERRORS.DOMAIN_ERROR);
-      }
-      if (r > n) return 0;
-
-      let result = 1;
-      for (let i = 0; i < r; i++) {
-        result *= n - i;
-      }
-      return result;
-    },
-
-    // Format number for display
-    formatNumber: (num) => {
-      if (!isFinite(num)) {
-        if (isNaN(num)) return ERRORS.MATH_ERROR;
-        return num > 0 ? "∞" : "-∞";
-      }
-
-      if (Math.abs(num) < CONSTANTS.EPSILON) return "0";
-
-      const absNum = Math.abs(num);
-      const sign = num < 0 ? "-" : "";
-
-      // Scientific notation for very large or very small numbers
-      if (absNum >= 1e10 || (absNum < 1e-4 && absNum !== 0)) {
-        return sign + absNum.toExponential(6);
-      }
-
-      // Regular formatting
-      if (absNum >= 1) {
-        return sign + absNum.toPrecision(Math.min(CONSTANTS.MAX_DIGITS, 15));
-      } else {
-        return sign + absNum.toFixed(Math.min(CONSTANTS.MAX_DIGITS - 1, 10));
-      }
-    },
-
-    // Check if number is close to an integer
-    isNearInteger: (num) => Math.abs(num - Math.round(num)) < CONSTANTS.EPSILON,
-  };
-
-  /**
-   * Expression parser and evaluator
-   */
-  const ExpressionParser = {
-    // Tokenize expression
-    tokenize: (expression) => {
-      const tokens = [];
-      const regex =
-        /(\d+\.?\d*|[+\-*/()^!%]|sin|cos|tan|log|ln|sqrt|abs|asin|acos|atan|nCr|nPr|π|e)/g;
-      let match;
-
-      while ((match = regex.exec(expression)) !== null) {
-        tokens.push(match[0]);
-      }
-
-      return tokens;
-    },
-
-    // Convert infix to postfix notation (Shunting Yard Algorithm)
-    infixToPostfix: (tokens) => {
-      const output = [];
-      const operators = [];
-
-      const precedence = {
-        "+": 1,
-        "-": 1,
-        "*": 2,
-        "/": 2,
-        "%": 2,
-        "^": 3,
-        "!": 4,
-        sin: 5,
-        cos: 5,
-        tan: 5,
-        asin: 5,
-        acos: 5,
-        atan: 5,
-        log: 5,
-        ln: 5,
-        sqrt: 5,
-        abs: 5,
-        nCr: 4,
-        nPr: 4,
-      };
-
-      const rightAssociative = ["^"];
-      const functions = [
-        "sin",
-        "cos",
-        "tan",
-        "asin",
-        "acos",
-        "atan",
-        "log",
-        "ln",
-        "sqrt",
-        "abs",
-      ];
-
-      for (let token of tokens) {
-        if (!isNaN(token) || token === "π" || token === "e") {
-          output.push(token);
-        } else if (functions.includes(token)) {
-          operators.push(token);
-        } else if (token === "(") {
-          operators.push(token);
-        } else if (token === ")") {
-          while (operators.length && operators[operators.length - 1] !== "(") {
-            output.push(operators.pop());
-          }
-          operators.pop(); // Remove '('
-
-          // Pop function if present
-          if (
-            operators.length &&
-            functions.includes(operators[operators.length - 1])
-          ) {
-            output.push(operators.pop());
-          }
-        } else if (precedence[token]) {
-          while (
-            operators.length &&
-            operators[operators.length - 1] !== "(" &&
-            (precedence[operators[operators.length - 1]] > precedence[token] ||
-              (precedence[operators[operators.length - 1]] ===
-                precedence[token] &&
-                !rightAssociative.includes(token)))
-          ) {
-            output.push(operators.pop());
-          }
-          operators.push(token);
-        }
-      }
-
-      while (operators.length) {
-        output.push(operators.pop());
-      }
-
-      return output;
-    },
-
-    // Evaluate postfix expression
-    evaluatePostfix: (postfixTokens) => {
-      const stack = [];
-
-      for (let token of postfixTokens) {
-        if (!isNaN(token)) {
-          stack.push(parseFloat(token));
-        } else if (token === "π") {
-          stack.push(CONSTANTS.PI);
-        } else if (token === "e") {
-          stack.push(CONSTANTS.E);
-        } else {
-          const result = this.applyOperation(token, stack);
-          stack.push(result);
-        }
-      }
-
-      if (stack.length !== 1) throw new Error(ERRORS.SYNTAX_ERROR);
-      return stack[0];
-    },
-
-    // Apply mathematical operations
-    applyOperation: (operator, stack) => {
-      switch (operator) {
-        case "+":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          return stack.pop() + stack.pop();
-
-        case "-":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const subtrahend = stack.pop();
-          return stack.pop() - subtrahend;
-
-        case "*":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          return stack.pop() * stack.pop();
-
-        case "/":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const divisor = stack.pop();
-          if (Math.abs(divisor) < CONSTANTS.EPSILON)
-            throw new Error(ERRORS.DIVIDE_BY_ZERO);
-          return stack.pop() / divisor;
-
-        case "%":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const modDivisor = stack.pop();
-          if (Math.abs(modDivisor) < CONSTANTS.EPSILON)
-            throw new Error(ERRORS.DIVIDE_BY_ZERO);
-          return stack.pop() % modDivisor;
-
-        case "^":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const exponent = stack.pop();
-          const base = stack.pop();
-          const result = Math.pow(base, exponent);
-          if (!isFinite(result)) throw new Error(ERRORS.OVERFLOW);
-          return result;
-
-        case "!":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          return MathUtils.factorial(stack.pop());
-
-        case "sin":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const sinArg = stack.pop();
-          return Math.sin(isRadianMode ? sinArg : MathUtils.degToRad(sinArg));
-
-        case "cos":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const cosArg = stack.pop();
-          return Math.cos(isRadianMode ? cosArg : MathUtils.degToRad(cosArg));
-
-        case "tan":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const tanArg = stack.pop();
-          return Math.tan(isRadianMode ? tanArg : MathUtils.degToRad(tanArg));
-
-        case "asin":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const asinArg = stack.pop();
-          if (Math.abs(asinArg) > 1) throw new Error(ERRORS.DOMAIN_ERROR);
-          const asinResult = Math.asin(asinArg);
-          return isRadianMode ? asinResult : MathUtils.radToDeg(asinResult);
-
-        case "acos":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const acosArg = stack.pop();
-          if (Math.abs(acosArg) > 1) throw new Error(ERRORS.DOMAIN_ERROR);
-          const acosResult = Math.acos(acosArg);
-          return isRadianMode ? acosResult : MathUtils.radToDeg(acosResult);
-
-        case "atan":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const atanArg = stack.pop();
-          const atanResult = Math.atan(atanArg);
-          return isRadianMode ? atanResult : MathUtils.radToDeg(atanResult);
-
-        case "log":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const logArg = stack.pop();
-          if (logArg <= 0) throw new Error(ERRORS.DOMAIN_ERROR);
-          return Math.log10(logArg);
-
-        case "ln":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const lnArg = stack.pop();
-          if (lnArg <= 0) throw new Error(ERRORS.DOMAIN_ERROR);
-          return Math.log(lnArg);
-
-        case "sqrt":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          const sqrtArg = stack.pop();
-          if (sqrtArg < 0) throw new Error(ERRORS.DOMAIN_ERROR);
-          return Math.sqrt(sqrtArg);
-
-        case "abs":
-          if (stack.length < 1) throw new Error(ERRORS.SYNTAX_ERROR);
-          return Math.abs(stack.pop());
-
-        case "nCr":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const r = stack.pop();
-          const n = stack.pop();
-          return MathUtils.combination(n, r);
-
-        case "nPr":
-          if (stack.length < 2) throw new Error(ERRORS.SYNTAX_ERROR);
-          const pR = stack.pop();
-          const pN = stack.pop();
-          return MathUtils.permutation(pN, pR);
-
-        default:
-          throw new Error(ERRORS.SYNTAX_ERROR);
-      }
-    },
-  };
-
-  // Public API
-  return {
-    // Initialize calculator
-    init() {
-      this.clear();
-      this.loadMemoryFromStorage();
-      this.loadHistoryFromStorage();
-    },
-
-    // Add character to current expression
-    addToExpression(char) {
-      if (currentExpression.length >= CONSTANTS.MAX_EXPRESSION_LENGTH) {
-        throw new Error("Expression too long");
-      }
-
-      currentExpression =
-        currentExpression.slice(0, cursorPosition) +
-        char +
-        currentExpression.slice(cursorPosition);
-      cursorPosition += char.length;
-      return currentExpression;
-    },
-
-    // Delete character at cursor position
-    deleteAtCursor() {
-      if (cursorPosition > 0) {
-        currentExpression =
-          currentExpression.slice(0, cursorPosition - 1) +
-          currentExpression.slice(cursorPosition);
-        cursorPosition--;
-      }
-      return currentExpression;
-    },
-
-    // Clear current expression
-    clearExpression() {
-      currentExpression = "";
-      cursorPosition = 0;
-      return currentExpression;
-    },
-
-    // Clear all (expression and result)
-    clear() {
-      currentExpression = "";
-      currentResult = "";
-      cursorPosition = 0;
-      is2ndFunction = false;
-      isAlphaFunction = false;
-      return { expression: currentExpression, result: currentResult };
-    },
-
-    // Calculate result
-    calculate() {
-      try {
-        if (!currentExpression.trim()) {
-          currentResult = "0";
-          return currentResult;
-        }
-
-        // Preprocess expression
-        let processedExpression = this.preprocessExpression(currentExpression);
-
-        // Tokenize and parse
-        const tokens = ExpressionParser.tokenize(processedExpression);
-        const postfixTokens = ExpressionParser.infixToPostfix(tokens);
-        const result = ExpressionParser.evaluatePostfix(postfixTokens);
-
-        // Format result
-        currentResult = MathUtils.formatNumber(result);
-        lastAnswer = result;
-
-        // Add to history
-        this.addToHistory(currentExpression, currentResult);
-
-        return currentResult;
-      } catch (error) {
-        currentResult = error.message || ERRORS.MATH_ERROR;
-        return currentResult;
-      }
-    },
-
-    // Preprocess expression for calculation
-    preprocessExpression(expr) {
-      return expr
-        .replace(/×/g, "*")
-        .replace(/÷/g, "/")
-        .replace(/−/g, "-")
-        .replace(/\^/g, "^")
-        .replace(/sin⁻¹/g, "asin")
-        .replace(/cos⁻¹/g, "acos")
-        .replace(/tan⁻¹/g, "atan")
-        .replace(/10\^x/g, "10^")
-        .replace(/e\^x/g, "e^")
-        .replace(/x²/g, "^2")
-        .replace(/√/g, "sqrt")
-        .replace(/1\/x/g, "1/")
-        .replace(/\(-\)/g, "-");
-    },
-
-    // Memory operations
-    memoryClear() {
-      memory = 0;
-      this.saveMemoryToStorage();
-      return memory;
-    },
-
-    memoryRecall() {
-      return memory;
-    },
-
-    memoryStore(value) {
-      memory = parseFloat(value) || 0;
-      this.saveMemoryToStorage();
-      return memory;
-    },
-
-    memoryAdd(value) {
-      memory += parseFloat(value) || 0;
-      this.saveMemoryToStorage();
-      return memory;
-    },
-
-    memorySubtract(value) {
-      memory -= parseFloat(value) || 0;
-      this.saveMemoryToStorage();
-      return memory;
-    },
-
-    // Mode operations
-    toggleAngleMode() {
-      isRadianMode = !isRadianMode;
-      return isRadianMode;
-    },
-
-    getAngleMode() {
-      return isRadianMode ? "RAD" : "DEG";
-    },
-
-    // Function mode operations
-    set2ndFunction(active) {
-      is2ndFunction = active;
-      return is2ndFunction;
-    },
-
-    get2ndFunction() {
-      return is2ndFunction;
-    },
-
-    setAlphaFunction(active) {
-      isAlphaFunction = active;
-      return isAlphaFunction;
-    },
-
-    getAlphaFunction() {
-      return isAlphaFunction;
-    },
-
-    // History operations
-    addToHistory(expression, result) {
-      const historyItem = {
-        expression,
-        result,
-        timestamp: new Date().toISOString(),
-      };
-
-      calculationHistory.unshift(historyItem);
-
-      // Keep only last 50 calculations
-      if (calculationHistory.length > 50) {
-        calculationHistory = calculationHistory.slice(0, 50);
-      }
-
-      this.saveHistoryToStorage();
-      return calculationHistory;
-    },
-
-    getHistory() {
-      return calculationHistory;
-    },
-
-    clearHistory() {
-      calculationHistory = [];
-      this.saveHistoryToStorage();
-      return calculationHistory;
-    },
-
-    // Storage operations
-    saveMemoryToStorage() {
-      try {
-        localStorage.setItem("ti30xs-memory", memory.toString());
-      } catch (e) {
-        console.warn("Could not save memory to localStorage:", e);
-      }
-    },
-
-    loadMemoryFromStorage() {
-      try {
-        const savedMemory = localStorage.getItem("ti30xs-memory");
-        if (savedMemory !== null) {
-          memory = parseFloat(savedMemory) || 0;
-        }
-      } catch (e) {
-        console.warn("Could not load memory from localStorage:", e);
-      }
-    },
-
-    saveHistoryToStorage() {
-      try {
-        localStorage.setItem(
-          "ti30xs-history",
-          JSON.stringify(calculationHistory)
-        );
-      } catch (e) {
-        console.warn("Could not save history to localStorage:", e);
-      }
-    },
-
-    loadHistoryFromStorage() {
-      try {
-        const savedHistory = localStorage.getItem("ti30xs-history");
-        if (savedHistory) {
-          calculationHistory = JSON.parse(savedHistory) || [];
-        }
-      } catch (e) {
-        console.warn("Could not load history from localStorage:", e);
-      }
-    },
-
-    // Getters
-    getCurrentExpression() {
-      return currentExpression;
-    },
-
-    getCurrentResult() {
-      return currentResult;
-    },
-
-    getCursorPosition() {
-      return cursorPosition;
-    },
-
-    setCursorPosition(position) {
-      cursorPosition = Math.max(
-        0,
-        Math.min(position, currentExpression.length)
-      );
-      return cursorPosition;
-    },
-
-    getLastAnswer() {
-      return lastAnswer;
-    },
-
-    hasMemory() {
-      return Math.abs(memory) > CONSTANTS.EPSILON;
-    },
-  };
-})();
-
-/**
- * User Interface Controller
- * Handles all UI interactions and updates
- */
-const UIController = (() => {
-  // DOM elements
+  // DOM Elements
   let elements = {};
 
-  // Animation classes
-  const ANIMATION_CLASSES = {
-    BUTTON_PRESSED: "btn--pressed",
-    DISPLAY_UPDATING: "display--updating",
-    CALCULATOR_ERROR: "calculator--error",
-  };
-
-  // Initialize UI
+  // Initialize calculator
   function init() {
-    cacheDOM();
-    bindEvents();
+    setupDOMElements();
+    setupEventListeners();
+    setupKeyboardSupport();
+    turnOn();
     updateDisplay();
-    updateIndicators();
-    loadHistory();
   }
 
-  // Cache DOM elements
-  function cacheDOM() {
+  // Setup DOM element references
+  function setupDOMElements() {
     elements = {
-      calculator: document.querySelector(".calculator"),
-      entryDisplay: document.getElementById("entry-display"),
-      resultDisplay: document.getElementById("result-display"),
-      degIndicator: document.getElementById("deg-indicator"),
-      memoryIndicator: document.getElementById("memory-indicator"),
-      shiftIndicator: document.getElementById("shift-indicator"),
-      alphaIndicator: document.getElementById("alpha-indicator"),
-      keypad: document.querySelector(".calculator__keypad"),
-      historyPanel: document.getElementById("history-panel"),
-      historyList: document.getElementById("history-list"),
-      clearHistoryBtn: document.getElementById("clear-history"),
-      errorModal: document.getElementById("error-modal"),
-      errorTitle: document.getElementById("error-title"),
-      errorMessage: document.getElementById("error-message"),
-      errorOkBtn: document.getElementById("error-ok"),
-      errorCloseBtn: document.querySelector(".modal__close"),
-      srAnnouncements: document.getElementById("sr-announcements"),
+      // Display elements
+      entryLine: document.getElementById("entry-line"),
+      resultLine: document.getElementById("result-line"),
+      historyLine1: document.getElementById("history-line-1"),
+      historyLine2: document.getElementById("history-line-2"),
+      display: document.querySelector(".display"),
+
+      // Status indicators
+      secondIndicator: document.getElementById("second-indicator"),
+      hypIndicator: document.getElementById("hyp-indicator"),
+      fixIndicator: document.getElementById("fix-indicator"),
+      sciIndicator: document.getElementById("sci-indicator"),
+      engIndicator: document.getElementById("eng-indicator"),
+      angleIndicator: document.getElementById("angle-indicator"),
+      kIndicator: document.getElementById("k-indicator"),
+      listIndicator: document.getElementById("list-indicator"),
+
+      // Buttons
+      onBtn: document.getElementById("on-btn"),
+      offBtn: document.getElementById("off-btn"),
+      secondBtn: document.getElementById("second-btn"),
+      modeBtn: document.getElementById("mode-btn"),
+      clearBtn: document.getElementById("clear-btn"),
+      deleteBtn: document.getElementById("delete-btn"),
+      insertBtn: document.getElementById("insert-btn"),
+      ansBtn: document.getElementById("ans-btn"),
+
+      // Memory buttons
+      stoBtn: document.getElementById("sto-btn"),
+      rclBtn: document.getElementById("rcl-btn"),
+      mPlusBtn: document.getElementById("m-plus-btn"),
+      mMinusBtn: document.getElementById("m-minus-btn"),
+
+      // Scientific buttons
+      sinBtn: document.getElementById("sin-btn"),
+      cosBtn: document.getElementById("cos-btn"),
+      tanBtn: document.getElementById("tan-btn"),
+      logBtn: document.getElementById("log-btn"),
+      lnBtn: document.getElementById("ln-btn"),
+      piBtn: document.getElementById("pi-btn"),
+      eBtn: document.getElementById("e-btn"),
+      factorialBtn: document.getElementById("factorial-btn"),
+      squareBtn: document.getElementById("square-btn"),
+      cubeBtn: document.getElementById("cube-btn"),
+      powerBtn: document.getElementById("power-btn"),
+      sqrtBtn: document.getElementById("sqrt-btn"),
+
+      // Fraction buttons
+      fractionBtn: document.getElementById("fraction-btn"),
+      mixedBtn: document.getElementById("mixed-btn"),
+      reciprocalBtn: document.getElementById("reciprocal-btn"),
+      absBtn: document.getElementById("abs-btn"),
+
+      // Statistics buttons
+      statBtn: document.getElementById("stat-btn"),
+      dataBtn: document.getElementById("data-btn"),
+      tableBtn: document.getElementById("table-btn"),
+      constBtn: document.getElementById("const-btn"),
+
+      // Number buttons
+      numberBtns: {},
+
+      // Operation buttons
+      addBtn: document.getElementById("add-btn"),
+      subtractBtn: document.getElementById("subtract-btn"),
+      multiplyBtn: document.getElementById("multiply-btn"),
+      divideBtn: document.getElementById("divide-btn"),
+      equalsBtn: document.getElementById("equals-btn"),
+      decimalBtn: document.getElementById("decimal-btn"),
+      negativeBtn: document.getElementById("negative-btn"),
+      leftParenBtn: document.getElementById("left-paren-btn"),
+      rightParenBtn: document.getElementById("right-paren-btn"),
+      eeBtn: document.getElementById("ee-btn"),
+
+      // Navigation buttons
+      leftArrowBtn: document.getElementById("left-arrow-btn"),
+      rightArrowBtn: document.getElementById("right-arrow-btn"),
+      upArrowBtn: document.getElementById("up-arrow-btn"),
+      downArrowBtn: document.getElementById("down-arrow-btn"),
+
+      // Special buttons
+      hypBtn: document.getElementById("hyp-btn"),
+      fixBtn: document.getElementById("fix-btn"),
+      sciBtn: document.getElementById("sci-btn"),
+      helpBtn: document.getElementById("help-btn"),
+
+      // Error display
+      errorDisplay: document.getElementById("error-display"),
+
+      // Help panel
+      helpPanel: document.getElementById("help-panel"),
+      helpCloseBtn: document.getElementById("help-close-btn"),
     };
+
+    // Setup number buttons
+    for (let i = 0; i <= 9; i++) {
+      elements.numberBtns[i] = document.getElementById(`btn-${i}`);
+    }
   }
 
-  // Bind event listeners
-  function bindEvents() {
-    // Button clicks
-    elements.keypad.addEventListener("click", handleButtonClick);
+  // Setup event listeners
+  function setupEventListeners() {
+    // Power buttons
+    elements.onBtn.addEventListener("click", turnOn);
+    elements.offBtn.addEventListener("click", turnOff);
 
-    // Keyboard input
-    document.addEventListener("keydown", handleKeyboardInput);
+    // Mode buttons
+    elements.secondBtn.addEventListener("click", toggleSecondMode);
+    elements.modeBtn.addEventListener("click", openModeMenu);
+    elements.hypBtn.addEventListener("click", toggleHypMode);
 
-    // History panel
-    elements.clearHistoryBtn?.addEventListener("click", clearHistory);
-    elements.historyList?.addEventListener("click", handleHistoryClick);
+    // Clear and edit buttons
+    elements.clearBtn.addEventListener("click", clearEntry);
+    elements.deleteBtn.addEventListener("click", deleteCharacter);
+    elements.insertBtn.addEventListener("click", toggleInsertMode);
+    elements.ansBtn.addEventListener("click", insertAnswer);
 
-    // Error modal
-    elements.errorOkBtn?.addEventListener("click", closeErrorModal);
-    elements.errorCloseBtn?.addEventListener("click", closeErrorModal);
-    elements.errorModal?.addEventListener("click", (e) => {
-      if (e.target === elements.errorModal) closeErrorModal();
+    // Memory buttons
+    elements.stoBtn.addEventListener("click", storeValue);
+    elements.rclBtn.addEventListener("click", recallValue);
+    elements.mPlusBtn.addEventListener("click", addToMemory);
+    elements.mMinusBtn.addEventListener("click", subtractFromMemory);
+
+    // Scientific function buttons
+    elements.sinBtn.addEventListener("click", () => executeTrigFunction("sin"));
+    elements.cosBtn.addEventListener("click", () => executeTrigFunction("cos"));
+    elements.tanBtn.addEventListener("click", () => executeTrigFunction("tan"));
+    elements.logBtn.addEventListener("click", () => executeLogFunction("log"));
+    elements.lnBtn.addEventListener("click", () => executeLogFunction("ln"));
+    elements.piBtn.addEventListener("click", insertConstant);
+    elements.eBtn.addEventListener("click", insertConstant);
+    elements.factorialBtn.addEventListener("click", executeFactorial);
+    elements.squareBtn.addEventListener("click", () => executePower(2));
+    elements.cubeBtn.addEventListener("click", () => executePower(3));
+    elements.powerBtn.addEventListener("click", insertOperator);
+    elements.sqrtBtn.addEventListener("click", executeSquareRoot);
+
+    // Fraction buttons
+    elements.fractionBtn.addEventListener("click", toggleFractionMode);
+    elements.mixedBtn.addEventListener("click", toggleMixedMode);
+    elements.reciprocalBtn.addEventListener("click", executeReciprocal);
+    elements.absBtn.addEventListener("click", executeAbsolute);
+
+    // Statistics buttons
+    elements.statBtn.addEventListener("click", openStatistics);
+    elements.dataBtn.addEventListener("click", openDataEditor);
+    elements.tableBtn.addEventListener("click", openTableFunction);
+    elements.constBtn.addEventListener("click", toggleConstant);
+
+    // Number buttons
+    Object.keys(elements.numberBtns).forEach((num) => {
+      elements.numberBtns[num].addEventListener("click", () =>
+        insertNumber(num)
+      );
     });
 
-    // Prevent context menu on buttons
-    elements.keypad.addEventListener("contextmenu", (e) => e.preventDefault());
+    // Operation buttons
+    elements.addBtn.addEventListener("click", () => insertOperator("+"));
+    elements.subtractBtn.addEventListener("click", () => insertOperator("−"));
+    elements.multiplyBtn.addEventListener("click", () => insertOperator("×"));
+    elements.divideBtn.addEventListener("click", () => insertOperator("÷"));
+    elements.equalsBtn.addEventListener("click", calculate);
+    elements.decimalBtn.addEventListener("click", insertDecimal);
+    elements.negativeBtn.addEventListener("click", insertNegative);
+    elements.leftParenBtn.addEventListener("click", () => insertOperator("("));
+    elements.rightParenBtn.addEventListener("click", () => insertOperator(")"));
+    elements.eeBtn.addEventListener("click", insertEE);
 
-    // Handle focus management
-    document.addEventListener("focusin", handleFocusIn);
+    // Navigation buttons
+    elements.leftArrowBtn.addEventListener("click", () => moveCursor(-1));
+    elements.rightArrowBtn.addEventListener("click", () => moveCursor(1));
+    elements.upArrowBtn.addEventListener("click", () => navigateHistory(-1));
+    elements.downArrowBtn.addEventListener("click", () => navigateHistory(1));
+
+    // Display format buttons
+    elements.fixBtn.addEventListener("click", () => setDisplayMode("FIX"));
+    elements.sciBtn.addEventListener("click", () => setDisplayMode("SCI"));
+
+    // Help panel
+    elements.helpBtn.addEventListener("click", openHelp);
+    elements.helpCloseBtn.addEventListener("click", closeHelp);
+
+    // Display click for focus
+    elements.display.addEventListener("click", () => elements.display.focus());
   }
 
-  // Handle button clicks
-  function handleButtonClick(e) {
-    const button = e.target.closest(".btn");
-    if (!button) return;
-
-    e.preventDefault();
-    animateButton(button);
-
-    const key = button.dataset.key;
-    if (key) {
-      processInput(key, button);
-    }
+  // Setup keyboard support
+  function setupKeyboardSupport() {
+    document.addEventListener("keydown", handleKeyPress);
   }
 
   // Handle keyboard input
-  function handleKeyboardInput(e) {
-    // Don't interfere with browser shortcuts
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
+  function handleKeyPress(event) {
+    if (!state.isOn) return;
 
-    const keyMap = {
-      0: "0",
-      1: "1",
-      2: "2",
-      3: "3",
-      4: "4",
-      5: "5",
-      6: "6",
-      7: "7",
-      8: "8",
-      9: "9",
-      "+": "add",
-      "-": "subtract",
-      "*": "multiply",
-      "/": "divide",
-      Enter: "enter",
-      "=": "enter",
-      Escape: "clear",
-      Backspace: "del",
-      Delete: "del",
-      ".": "decimal",
-      ",": "decimal",
-      "(": "leftparen",
-      ")": "rightparen",
-      s: "sin",
-      c: "cos",
-      t: "tan",
-      l: "log",
-      n: "ln",
-      r: "sqrt",
-      p: "pi",
-      e: "ee",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      m: "mode",
-      M: "mode",
-    };
+    const key = event.key;
+    const keyCode = event.keyCode;
 
-    const mappedKey = keyMap[e.key];
-    if (mappedKey) {
-      e.preventDefault();
+    // Prevent default for calculator keys
+    if (isCalculatorKey(key, keyCode)) {
+      event.preventDefault();
+    }
 
-      // Find and animate corresponding button
-      const button = document.querySelector(`[data-key="${mappedKey}"]`);
-      if (button) {
-        animateButton(button);
-        processInput(mappedKey, button);
-      }
+    // Number keys
+    if (key >= "0" && key <= "9") {
+      insertNumber(key);
+    }
+    // Decimal
+    else if (key === ".") {
+      insertDecimal();
+    }
+    // Operators
+    else if (key === "+") {
+      insertOperator("+");
+    } else if (key === "-") {
+      insertOperator("−");
+    } else if (key === "*") {
+      insertOperator("×");
+    } else if (key === "/") {
+      insertOperator("÷");
+    } else if (key === "^") {
+      insertOperator("^");
+    }
+    // Parentheses
+    else if (key === "(") {
+      insertOperator("(");
+    } else if (key === ")") {
+      insertOperator(")");
+    }
+    // Enter/Equals
+    else if (key === "Enter" || key === "=") {
+      calculate();
+    }
+    // Backspace
+    else if (key === "Backspace") {
+      deleteCharacter();
+    }
+    // Escape
+    else if (key === "Escape") {
+      clearEntry();
+    }
+    // Arrow keys
+    else if (key === "ArrowLeft") {
+      moveCursor(-1);
+    } else if (key === "ArrowRight") {
+      moveCursor(1);
+    } else if (key === "ArrowUp") {
+      navigateHistory(-1);
+    } else if (key === "ArrowDown") {
+      navigateHistory(1);
+    }
+    // Home/End
+    else if (key === "Home") {
+      state.cursorPosition = 0;
+      updateDisplay();
+    } else if (key === "End") {
+      state.cursorPosition = state.entryLine.length;
+      updateDisplay();
     }
   }
 
-  // Process user input
-  function processInput(key, button) {
-    try {
-      const is2nd = CalculatorEngine.get2ndFunction();
-      const isAlpha = CalculatorEngine.getAlphaFunction();
+  // Check if key is a calculator key
+  function isCalculatorKey(key, keyCode) {
+    const calculatorKeys = [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      ".",
+      "+",
+      "-",
+      "*",
+      "/",
+      "^",
+      "(",
+      ")",
+      "=",
+      "Enter",
+      "Backspace",
+      "Escape",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ];
+    return calculatorKeys.includes(key);
+  }
 
-      switch (key) {
-        case "0":
-        case "1":
-        case "2":
-        case "3":
-        case "4":
-        case "5":
-        case "6":
-        case "7":
-        case "8":
-        case "9":
-          CalculatorEngine.addToExpression(key);
-          break;
-
-        case "decimal":
-          CalculatorEngine.addToExpression(".");
-          break;
-
-        case "add":
-          CalculatorEngine.addToExpression(" + ");
-          break;
-
-        case "subtract":
-          CalculatorEngine.addToExpression(" − ");
-          break;
-
-        case "multiply":
-          CalculatorEngine.addToExpression(" × ");
-          break;
-
-        case "divide":
-          CalculatorEngine.addToExpression(" ÷ ");
-          break;
-
-        case "leftparen":
-          CalculatorEngine.addToExpression(is2nd ? "{" : "(");
-          break;
-
-        case "rightparen":
-          CalculatorEngine.addToExpression(is2nd ? "}" : ")");
-          break;
-
-        case "enter":
-          const result = CalculatorEngine.calculate();
-          announceToScreenReader(`Result: ${result}`);
-          break;
-
-        case "clear":
-          CalculatorEngine.clear();
-          announceToScreenReader("Calculator cleared");
-          break;
-
-        case "del":
-          CalculatorEngine.deleteAtCursor();
-          break;
-
-        case "2nd":
-          const new2ndState = !CalculatorEngine.get2ndFunction();
-          CalculatorEngine.set2ndFunction(new2ndState);
-          CalculatorEngine.setAlphaFunction(false); // Clear alpha when 2nd is activated
-          announceToScreenReader(
-            new2ndState
-              ? "Second function activated"
-              : "Second function deactivated"
-          );
-          break;
-
-        case "alpha":
-          const newAlphaState = !CalculatorEngine.getAlphaFunction();
-          CalculatorEngine.setAlphaFunction(newAlphaState);
-          CalculatorEngine.set2ndFunction(false); // Clear 2nd when alpha is activated
-          announceToScreenReader(
-            newAlphaState
-              ? "Alpha function activated"
-              : "Alpha function deactivated"
-          );
-          break;
-
-        case "mode":
-          const newMode = CalculatorEngine.toggleAngleMode();
-          announceToScreenReader(
-            `Angle mode: ${CalculatorEngine.getAngleMode()}`
-          );
-          break;
-
-        case "sin":
-          CalculatorEngine.addToExpression(is2nd ? "sin⁻¹(" : "sin(");
-          break;
-
-        case "cos":
-          CalculatorEngine.addToExpression(is2nd ? "cos⁻¹(" : "cos(");
-          break;
-
-        case "tan":
-          CalculatorEngine.addToExpression(is2nd ? "tan⁻¹(" : "tan(");
-          break;
-
-        case "log":
-          CalculatorEngine.addToExpression(is2nd ? "10^(" : "log(");
-          break;
-
-        case "ln":
-          CalculatorEngine.addToExpression(is2nd ? "e^(" : "ln(");
-          break;
-
-        case "x2":
-          CalculatorEngine.addToExpression(is2nd ? "√(" : "^2");
-          break;
-
-        case "xy":
-          CalculatorEngine.addToExpression(is2nd ? "y√(" : "^(");
-          break;
-
-        case "1x":
-          CalculatorEngine.addToExpression(is2nd ? "nCr(" : "1/");
-          break;
-
-        case "neg":
-          CalculatorEngine.addToExpression(is2nd ? "π" : "(-)");
-          break;
-
-        case "ee":
-          CalculatorEngine.addToExpression(is2nd ? "nPr(" : "EE");
-          break;
-
-        case "sto":
-          if (CalculatorEngine.getCurrentResult()) {
-            CalculatorEngine.memoryStore(CalculatorEngine.getCurrentResult());
-            announceToScreenReader("Value stored to memory");
-          }
-          break;
-
-        case "rcl":
-          const memoryValue = CalculatorEngine.memoryRecall();
-          CalculatorEngine.addToExpression(memoryValue.toString());
-          announceToScreenReader(`Memory recalled: ${memoryValue}`);
-          break;
-
-        case "mplus":
-          if (CalculatorEngine.getCurrentResult()) {
-            CalculatorEngine.memoryAdd(CalculatorEngine.getCurrentResult());
-            announceToScreenReader("Value added to memory");
-          }
-          break;
-
-        case "mminus":
-          if (CalculatorEngine.getCurrentResult()) {
-            CalculatorEngine.memorySubtract(
-              CalculatorEngine.getCurrentResult()
-            );
-            announceToScreenReader("Value subtracted from memory");
-          }
-          break;
-
-        case "left":
-          const currentPos = CalculatorEngine.getCursorPosition();
-          CalculatorEngine.setCursorPosition(currentPos - 1);
-          break;
-
-        case "right":
-          const currentPos2 = CalculatorEngine.getCursorPosition();
-          CalculatorEngine.setCursorPosition(currentPos2 + 1);
-          break;
-
-        case "percent":
-          CalculatorEngine.addToExpression(" % ");
-          break;
-
-        case "frac":
-          CalculatorEngine.addToExpression("a b/c");
-          break;
-
-        default:
-          console.warn("Unhandled key:", key);
-      }
-
-      // Clear function modes after operation (except for mode toggles)
-      if (!["2nd", "alpha", "mode"].includes(key)) {
-        CalculatorEngine.set2ndFunction(false);
-        CalculatorEngine.setAlphaFunction(false);
-      }
-    } catch (error) {
-      showError("Input Error", error.message);
-    }
-
+  // Power functions
+  function turnOn() {
+    state.isOn = true;
+    state.entryLine = "";
+    state.resultLine = "";
     updateDisplay();
+    updateIndicators();
+    showMessage("Calculator turned on");
+  }
+
+  function turnOff() {
+    state.isOn = false;
+    state.entryLine = "";
+    state.resultLine = "";
+    updateDisplay();
+    updateIndicators();
+    showMessage("Calculator turned off");
+  }
+
+  // Mode functions
+  function toggleSecondMode() {
+    state.isSecondMode = !state.isSecondMode;
+    updateIndicators();
+    updateButtonStates();
+  }
+
+  function toggleHypMode() {
+    state.isHypMode = !state.isHypMode;
+    updateIndicators();
+    updateButtonStates();
+  }
+
+  function setDisplayMode(mode) {
+    state.displayMode = mode;
+    if (mode === "FIX") {
+      state.fixDecimals =
+        prompt("Enter number of decimal places (0-9):", "2") || 2;
+      state.fixDecimals = Math.max(0, Math.min(9, parseInt(state.fixDecimals)));
+    }
+    updateIndicators();
+    updateDisplay();
+  }
+
+  function setAngleMode(mode) {
+    state.angleMode = mode;
     updateIndicators();
   }
 
-  // Animate button press
-  function animateButton(button) {
-    button.classList.add(ANIMATION_CLASSES.BUTTON_PRESSED);
+  // Input functions
+  function insertNumber(num) {
+    if (!state.isOn) return;
 
-    // Provide haptic feedback if available
-    if (navigator.vibrate) {
-      navigator.vibrate(10);
+    if (state.entryLine.length >= MAX_DISPLAY_LENGTH) {
+      showError("Entry too long");
+      return;
     }
 
-    setTimeout(() => {
-      button.classList.remove(ANIMATION_CLASSES.BUTTON_PRESSED);
-    }, 150);
+    if (state.isInFractionMode) {
+      // Handle fraction input
+      insertFractionNumber(num);
+    } else {
+      state.entryLine += num;
+    }
+
+    updateDisplay();
   }
 
-  // Update display
-  function updateDisplay() {
-    const expression = CalculatorEngine.getCurrentExpression() || "0";
-    const result = CalculatorEngine.getCurrentResult();
+  function insertDecimal() {
+    if (!state.isOn) return;
 
-    elements.entryDisplay.textContent = expression;
-    elements.resultDisplay.textContent = result;
+    // Check if current number already has a decimal
+    const currentNumber = getCurrentNumber();
+    if (currentNumber.includes(".")) {
+      showError("Decimal already exists");
+      return;
+    }
 
-    // Add updating animation
-    elements.entryDisplay.classList.add(ANIMATION_CLASSES.DISPLAY_UPDATING);
-    elements.resultDisplay.classList.add(ANIMATION_CLASSES.DISPLAY_UPDATING);
-
-    setTimeout(() => {
-      elements.entryDisplay.classList.remove(
-        ANIMATION_CLASSES.DISPLAY_UPDATING
-      );
-      elements.resultDisplay.classList.remove(
-        ANIMATION_CLASSES.DISPLAY_UPDATING
-      );
-    }, 200);
+    state.entryLine += ".";
+    updateDisplay();
   }
 
-  // Update indicators
-  function updateIndicators() {
-    const angleMode = CalculatorEngine.getAngleMode();
-    const hasMemory = CalculatorEngine.hasMemory();
-    const is2nd = CalculatorEngine.get2ndFunction();
-    const isAlpha = CalculatorEngine.getAlphaFunction();
+  function insertNegative() {
+    if (!state.isOn) return;
 
-    // Update angle mode indicator
-    elements.degIndicator.textContent = angleMode;
-    elements.degIndicator.classList.toggle("indicator--active", true);
+    const currentNumber = getCurrentNumber();
+    if (currentNumber.startsWith("-")) {
+      // Remove negative
+      state.entryLine = state.entryLine.replace(/^-/, "");
+    } else {
+      // Add negative
+      state.entryLine = "-" + state.entryLine;
+    }
 
-    // Update memory indicator
-    elements.memoryIndicator.classList.toggle("indicator--active", hasMemory);
-
-    // Update function indicators
-    elements.shiftIndicator.classList.toggle("indicator--active", is2nd);
-    elements.alphaIndicator.classList.toggle("indicator--active", isAlpha);
-
-    // Update button states
-    updateButtonStates(is2nd, isAlpha);
+    updateDisplay();
   }
 
-  // Update button visual states based on active functions
-  function updateButtonStates(is2nd, isAlpha) {
-    const buttons = document.querySelectorAll(".btn");
+  function insertOperator(operator) {
+    if (!state.isOn) return;
 
-    buttons.forEach((button) => {
-      button.classList.remove("btn--active");
-
-      if (is2nd && button.dataset.key === "2nd") {
-        button.classList.add("btn--active");
+    // Handle special operators based on mode
+    if (state.isSecondMode) {
+      switch (operator) {
+        case "sin":
+          operator = "sin⁻¹";
+          break;
+        case "cos":
+          operator = "cos⁻¹";
+          break;
+        case "tan":
+          operator = "tan⁻¹";
+          break;
+        case "log":
+          operator = "10^x";
+          break;
+        case "ln":
+          operator = "e^x";
+          break;
       }
+    }
 
-      if (isAlpha && button.dataset.key === "alpha") {
-        button.classList.add("btn--active");
+    if (state.isHypMode) {
+      switch (operator) {
+        case "sin":
+          operator = "sinh";
+          break;
+        case "cos":
+          operator = "cosh";
+          break;
+        case "tan":
+          operator = "tanh";
+          break;
       }
-    });
+    }
+
+    state.entryLine += operator;
+    updateDisplay();
   }
 
-  // Show error modal
-  function showError(title, message) {
-    elements.errorTitle.textContent = title;
-    elements.errorMessage.textContent = message;
-    elements.errorModal.hidden = false;
-    elements.errorOkBtn.focus();
+  function insertConstant() {
+    if (!state.isOn) return;
 
-    // Add error animation to calculator
-    elements.calculator.classList.add(ANIMATION_CLASSES.CALCULATOR_ERROR);
-    setTimeout(() => {
-      elements.calculator.classList.remove(ANIMATION_CLASSES.CALCULATOR_ERROR);
-    }, 300);
+    const constant = state.isSecondMode ? "e" : "π";
+    const value = constant === "π" ? PI : E;
 
-    announceToScreenReader(`Error: ${message}`);
+    if (state.isInFractionMode) {
+      insertFractionNumber(value.toString());
+    } else {
+      state.entryLine += constant;
+    }
+
+    updateDisplay();
   }
 
-  // Close error modal
-  function closeErrorModal() {
-    elements.errorModal.hidden = true;
+  function insertAnswer() {
+    if (!state.isOn) return;
+
+    const answer = formatNumber(state.lastAnswer);
+    state.entryLine += answer;
+    updateDisplay();
   }
 
-  // Handle history operations
-  function loadHistory() {
-    const history = CalculatorEngine.getHistory();
-    updateHistoryDisplay(history);
+  function insertEE() {
+    if (!state.isOn) return;
+
+    state.isInEE = true;
+    state.entryLine += "E";
+    updateDisplay();
   }
 
-  function clearHistory() {
-    CalculatorEngine.clearHistory();
-    updateHistoryDisplay([]);
-    announceToScreenReader("History cleared");
+  // Edit functions
+  function clearEntry() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Clear all memory and reset
+      clearAllMemory();
+      showMessage("All memory cleared");
+    } else {
+      // Clear current entry
+      state.entryLine = "";
+      state.resultLine = "";
+    }
+
+    updateDisplay();
   }
 
-  function handleHistoryClick(e) {
-    const historyItem = e.target.closest(".history__item");
-    if (!historyItem) return;
+  function deleteCharacter() {
+    if (!state.isOn) return;
 
-    const expression = historyItem.dataset.expression;
-    if (expression) {
-      CalculatorEngine.clearExpression();
-      CalculatorEngine.addToExpression(expression);
+    if (state.isSecondMode) {
+      // Insert mode
+      toggleInsertMode();
+    } else {
+      // Delete character
+      if (state.entryLine.length > 0) {
+        state.entryLine = state.entryLine.slice(0, -1);
+      }
+    }
+
+    updateDisplay();
+  }
+
+  function toggleInsertMode() {
+    state.isInsertMode = !state.isInsertMode;
+    updateIndicators();
+  }
+
+  function moveCursor(direction) {
+    if (!state.isOn) return;
+
+    const newPosition = state.cursorPosition + direction;
+    if (newPosition >= 0 && newPosition <= state.entryLine.length) {
+      state.cursorPosition = newPosition;
       updateDisplay();
-      announceToScreenReader(`Loaded from history: ${expression}`);
     }
   }
 
-  function updateHistoryDisplay(history) {
-    if (!elements.historyList) return;
+  // Navigation functions
+  function navigateHistory(direction) {
+    if (!state.isOn || state.history.length === 0) return;
 
-    elements.historyList.innerHTML = "";
-
-    history.forEach((item, index) => {
-      const historyElement = document.createElement("div");
-      historyElement.className = "history__item";
-      historyElement.dataset.expression = item.expression;
-      historyElement.innerHTML = `
-        <div class="history__expression">${item.expression}</div>
-        <div class="history__result">${item.result}</div>
-      `;
-      historyElement.setAttribute("role", "button");
-      historyElement.setAttribute("tabindex", "0");
-      historyElement.setAttribute(
-        "aria-label",
-        `History item ${index + 1}: ${item.expression} equals ${item.result}`
-      );
-
-      elements.historyList.appendChild(historyElement);
-    });
+    // Implementation for history navigation
+    // This would require additional state management for history position
+    showMessage("History navigation not yet implemented");
   }
 
-  // Screen reader announcements
-  function announceToScreenReader(message) {
-    if (elements.srAnnouncements) {
-      elements.srAnnouncements.textContent = message;
+  // Memory functions
+  function storeValue() {
+    if (!state.isOn) return;
 
-      // Clear after announcement
-      setTimeout(() => {
-        elements.srAnnouncements.textContent = "";
-      }, 1000);
+    const value = parseFloat(state.resultLine) || 0;
+    state.memory.M = value;
+    showMessage(`Stored ${formatNumber(value)}`);
+  }
+
+  function recallValue() {
+    if (!state.isOn) return;
+
+    if (state.isSecondMode) {
+      // Show memory variables menu
+      showMemoryVariables();
+    } else {
+      // Recall M
+      const value = formatNumber(state.memory.M);
+      state.entryLine += value;
+      updateDisplay();
     }
   }
 
-  // Handle focus management for accessibility
-  function handleFocusIn(e) {
-    const button = e.target.closest(".btn");
-    if (button) {
-      const primary = button.querySelector(".btn__primary")?.textContent;
-      const secondary = button.querySelector(".btn__secondary")?.textContent;
+  function addToMemory() {
+    if (!state.isOn) return;
 
-      let announcement = `Button: ${primary}`;
-      if (secondary && CalculatorEngine.get2ndFunction()) {
-        announcement += `, second function: ${secondary}`;
+    const value = parseFloat(state.resultLine) || 0;
+    state.memory.M += value;
+    showMessage(`Added ${formatNumber(value)} to memory`);
+  }
+
+  function subtractFromMemory() {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+    state.memory.M -= value;
+    showMessage(`Subtracted ${formatNumber(value)} from memory`);
+  }
+
+  function clearAllMemory() {
+    state.memory = {
+      M: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      t: 0,
+      a: 0,
+      b: 0,
+      c: 0,
+    };
+    state.lastAnswer = 0;
+    state.history = [];
+  }
+
+  // Scientific functions
+  function executeTrigFunction(func) {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+    let result;
+
+    // Convert to radians if needed
+    const angleInRadians = convertAngleToRadians(value);
+
+    if (state.isSecondMode) {
+      // Inverse functions
+      switch (func) {
+        case "sin":
+          result = Math.asin(value);
+          break;
+        case "cos":
+          result = Math.acos(value);
+          break;
+        case "tan":
+          result = Math.atan(value);
+          break;
       }
-
-      announceToScreenReader(announcement);
+      result = convertRadiansToAngle(result);
+    } else {
+      // Regular functions
+      switch (func) {
+        case "sin":
+          result = Math.sin(angleInRadians);
+          break;
+        case "cos":
+          result = Math.cos(angleInRadians);
+          break;
+        case "tan":
+          result = Math.tan(angleInRadians);
+          break;
+      }
     }
+
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executeLogFunction(func) {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+    let result;
+
+    if (state.isSecondMode) {
+      // Inverse functions
+      switch (func) {
+        case "log":
+          result = Math.pow(10, value);
+          break;
+        case "ln":
+          result = Math.pow(E, value);
+          break;
+      }
+    } else {
+      // Regular functions
+      switch (func) {
+        case "log":
+          result = Math.log10(value);
+          break;
+        case "ln":
+          result = Math.log(value);
+          break;
+      }
+    }
+
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executeFactorial() {
+    if (!state.isOn) return;
+
+    const value = parseInt(state.resultLine) || 0;
+
+    if (value < 0 || value !== Math.floor(value)) {
+      showError("Invalid input for factorial");
+      return;
+    }
+
+    if (value > 170) {
+      showError("Factorial too large");
+      return;
+    }
+
+    let result = 1;
+    for (let i = 2; i <= value; i++) {
+      result *= i;
+    }
+
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executePower(power) {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+    const result = Math.pow(value, power);
+
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executeSquareRoot() {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+
+    if (value < 0) {
+      showError("Invalid input for square root");
+      return;
+    }
+
+    const result = Math.sqrt(value);
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executeReciprocal() {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+
+    if (value === 0) {
+      showError("Division by zero");
+      return;
+    }
+
+    const result = 1 / value;
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  function executeAbsolute() {
+    if (!state.isOn) return;
+
+    const value = parseFloat(state.resultLine) || 0;
+    const result = Math.abs(value);
+
+    state.resultLine = formatNumber(result);
+    updateDisplay();
+  }
+
+  // Fraction functions
+  function toggleFractionMode() {
+    state.isInFractionMode = !state.isInFractionMode;
+    updateIndicators();
+  }
+
+  function toggleMixedMode() {
+    state.isInMixedMode = !state.isInMixedMode;
+    updateIndicators();
+  }
+
+  function insertFractionNumber(num) {
+    // Simplified fraction input
+    state.entryLine += num;
+  }
+
+  // Statistics functions
+  function openStatistics() {
+    showMessage("Statistics mode not yet implemented");
+  }
+
+  function openDataEditor() {
+    showMessage("Data editor not yet implemented");
+  }
+
+  function openTableFunction() {
+    showMessage("Table function not yet implemented");
+  }
+
+  function toggleConstant() {
+    state.isInConstant = !state.isInConstant;
+    updateIndicators();
+  }
+
+  // Calculation functions
+  function calculate() {
+    if (!state.isOn || !state.entryLine) return;
+
+    try {
+      // Parse and evaluate expression
+      const expression = parseExpression(state.entryLine);
+      const result = evaluateExpression(expression);
+
+      if (isFinite(result)) {
+        state.lastAnswer = result;
+        state.resultLine = formatNumber(result);
+
+        // Add to history
+        addToHistory(state.entryLine, state.resultLine);
+
+        state.entryLine = "";
+      } else {
+        showError("Invalid calculation");
+      }
+    } catch (error) {
+      showError("Syntax error");
+    }
+
+    updateDisplay();
+  }
+
+  // Expression parsing and evaluation
+  function parseExpression(expr) {
+    // Replace display symbols with JavaScript operators
+    expr = expr
+      .replace(/×/g, "*")
+      .replace(/÷/g, "/")
+      .replace(/−/g, "-")
+      .replace(/π/g, PI.toString())
+      .replace(/e/g, E.toString());
+
+    return expr;
+  }
+
+  function evaluateExpression(expr) {
+    // Basic expression evaluation with PEMDAS
+    // This is a simplified version - a full implementation would need
+    // a proper expression parser for complex mathematical operations
+
+    // For now, use eval with safety checks
+    const sanitizedExpr = expr.replace(/[^0-9+\-*/().,]/g, "");
+    return eval(sanitizedExpr);
+  }
+
+  // Utility functions
+  function formatNumber(num) {
+    if (!isFinite(num)) return "Error";
+
+    let formatted;
+
+    switch (state.displayMode) {
+      case "FIX":
+        formatted = num.toFixed(state.fixDecimals);
+        break;
+      case "SCI":
+        formatted = num.toExponential(DISPLAY_PRECISION);
+        break;
+      case "ENG":
+        formatted = formatEngineering(num);
+        break;
+      default: // NORM
+        formatted = num.toString();
+        if (formatted.length > DISPLAY_PRECISION) {
+          formatted = parseFloat(num.toPrecision(DISPLAY_PRECISION)).toString();
+        }
+    }
+
+    return formatted;
+  }
+
+  function formatEngineering(num) {
+    const exp = Math.floor(Math.log10(Math.abs(num)));
+    const engExp = Math.floor(exp / 3) * 3;
+    const mantissa = num / Math.pow(10, engExp);
+    return mantissa.toFixed(3) + "E" + engExp;
+  }
+
+  function convertAngleToRadians(angle) {
+    switch (state.angleMode) {
+      case "DEG":
+        return (angle * Math.PI) / 180;
+      case "RAD":
+        return angle;
+      case "GRAD":
+        return (angle * Math.PI) / 200;
+      default:
+        return angle;
+    }
+  }
+
+  function convertRadiansToAngle(radians) {
+    switch (state.angleMode) {
+      case "DEG":
+        return (radians * 180) / Math.PI;
+      case "RAD":
+        return radians;
+      case "GRAD":
+        return (radians * 200) / Math.PI;
+      default:
+        return radians;
+    }
+  }
+
+  function getCurrentNumber() {
+    // Extract the current number being entered
+    const match = state.entryLine.match(/[-+]?[\d.]*$/);
+    return match ? match[0] : "";
+  }
+
+  function addToHistory(entry, result) {
+    state.history.unshift({ entry, result });
+    if (state.history.length > HISTORY_SIZE) {
+      state.history.pop();
+    }
+  }
+
+  // Display update functions
+  function updateDisplay() {
+    if (!state.isOn) {
+      elements.entryLine.textContent = "";
+      elements.resultLine.textContent = "";
+      return;
+    }
+
+    elements.entryLine.textContent = state.entryLine;
+    elements.resultLine.textContent = state.resultLine;
+
+    // Update history lines
+    if (state.history.length > 0) {
+      elements.historyLine1.textContent = state.history[0].entry;
+      elements.historyLine2.textContent = state.history[0].result;
+    } else {
+      elements.historyLine1.textContent = "";
+      elements.historyLine2.textContent = "";
+    }
+  }
+
+  function updateIndicators() {
+    // Update status indicators
+    elements.secondIndicator.classList.toggle("active", state.isSecondMode);
+    elements.hypIndicator.classList.toggle("active", state.isHypMode);
+    elements.fixIndicator.classList.toggle(
+      "active",
+      state.displayMode === "FIX"
+    );
+    elements.sciIndicator.classList.toggle(
+      "active",
+      state.displayMode === "SCI"
+    );
+    elements.engIndicator.classList.toggle(
+      "active",
+      state.displayMode === "ENG"
+    );
+    elements.angleIndicator.textContent = state.angleMode;
+    elements.kIndicator.classList.toggle("active", state.isInConstant);
+  }
+
+  function updateButtonStates() {
+    // Update button visual states based on modes
+    elements.secondBtn.classList.toggle("secondary-active", state.isSecondMode);
+    elements.hypBtn.classList.toggle("hyp-active", state.isHypMode);
+  }
+
+  // Error and message functions
+  function showError(message) {
+    elements.errorDisplay.textContent = message;
+    elements.errorDisplay.hidden = false;
+
+    setTimeout(() => {
+      elements.errorDisplay.hidden = true;
+    }, 3000);
+  }
+
+  function showMessage(message) {
+    // Simple message display - could be enhanced with a toast notification
+    console.log(message);
+  }
+
+  // Menu functions
+  function openModeMenu() {
+    const modes = [
+      { name: "Number Format", options: ["NORM", "FIX", "SCI", "ENG"] },
+      { name: "Angle Unit", options: ["DEG", "RAD", "GRAD"] },
+      { name: "Display Format", options: ["MathPrint", "Classic"] },
+    ];
+
+    // Simplified mode menu - could be enhanced with a proper modal
+    const mode = prompt(
+      "Select mode:\n1. Number Format\n2. Angle Unit\n3. Display Format"
+    );
+
+    switch (mode) {
+      case "1":
+        const numFormat = prompt(
+          "Select number format:\n1. NORM\n2. FIX\n3. SCI\n4. ENG"
+        );
+        const numFormats = ["NORM", "FIX", "SCI", "ENG"];
+        if (numFormat && numFormats[numFormat - 1]) {
+          setDisplayMode(numFormats[numFormat - 1]);
+        }
+        break;
+      case "2":
+        const angleMode = prompt("Select angle unit:\n1. DEG\n2. RAD\n3. GRAD");
+        const angleModes = ["DEG", "RAD", "GRAD"];
+        if (angleMode && angleModes[angleMode - 1]) {
+          setAngleMode(angleModes[angleMode - 1]);
+        }
+        break;
+    }
+  }
+
+  function showMemoryVariables() {
+    const variables = Object.keys(state.memory);
+    const varList = variables
+      .map((v) => `${v}: ${formatNumber(state.memory[v])}`)
+      .join("\n");
+    alert(`Memory Variables:\n${varList}`);
+  }
+
+  function openHelp() {
+    elements.helpPanel.hidden = false;
+  }
+
+  function closeHelp() {
+    elements.helpPanel.hidden = true;
   }
 
   // Public API
   return {
-    init,
-    updateDisplay,
-    updateIndicators,
-    showError,
-    announceToScreenReader,
+    init: init,
+    turnOn: turnOn,
+    turnOff: turnOff,
+    calculate: calculate,
+    clearEntry: clearEntry,
+    deleteCharacter: deleteCharacter,
+    insertNumber: insertNumber,
+    insertOperator: insertOperator,
+    insertDecimal: insertDecimal,
+    insertNegative: insertNegative,
+    toggleSecondMode: toggleSecondMode,
+    toggleHypMode: toggleHypMode,
+    setDisplayMode: setDisplayMode,
+    setAngleMode: setAngleMode,
+    storeValue: storeValue,
+    recallValue: recallValue,
+    addToMemory: addToMemory,
+    subtractFromMemory: subtractFromMemory,
+    executeTrigFunction: executeTrigFunction,
+    executeLogFunction: executeLogFunction,
+    executeFactorial: executeFactorial,
+    executePower: executePower,
+    executeSquareRoot: executeSquareRoot,
+    executeReciprocal: executeReciprocal,
+    executeAbsolute: executeAbsolute,
+    toggleFractionMode: toggleFractionMode,
+    toggleMixedMode: toggleMixedMode,
+    toggleConstant: toggleConstant,
+    openStatistics: openStatistics,
+    openDataEditor: openDataEditor,
+    openTableFunction: openTableFunction,
+    openModeMenu: openModeMenu,
+    moveCursor: moveCursor,
+    navigateHistory: navigateHistory,
+    showError: showError,
+    showMessage: showMessage,
+    getState: () => ({ ...state }),
+    getMemory: () => ({ ...state.memory }),
   };
 })();
 
-/**
- * Application Initialization
- */
-document.addEventListener("DOMContentLoaded", () => {
-  try {
-    // Initialize calculator engine
-    CalculatorEngine.init();
-
-    // Initialize UI controller
-    UIController.init();
-
-    // Set initial focus
-    const firstButton = document.querySelector(".btn");
-    if (firstButton) {
-      firstButton.focus();
-    }
-
-    console.log("TI-30XS MultiView Calculator initialized successfully");
-
-    // Register service worker for offline functionality (if available)
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch((err) => {
-        console.log("Service worker registration failed:", err);
-      });
-    }
-  } catch (error) {
-    console.error("Failed to initialize calculator:", error);
-    UIController.showError(
-      "Initialization Error",
-      "Calculator failed to initialize properly. Please refresh the page."
-    );
-  }
+// Initialize calculator when DOM is loaded
+document.addEventListener("DOMContentLoaded", function () {
+  TI30XSCalculator.init();
 });
 
-// Export for testing purposes
+// Export for testing (if needed)
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { CalculatorEngine, UIController };
+  module.exports = TI30XSCalculator;
 }
